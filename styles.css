@@ -910,10 +910,11 @@ legend.field-label { padding: 0; margin: 0 0 7px; }
 @keyframes tmole { 0%, 100% { transform: translateY(40px); } 25%, 60% { transform: translateY(0); } }
 .mach-claw .claw-arm { transform-box: fill-box; transform-origin: 50% 0; transition: transform .5s var(--spring); }
 .mach-claw:hover .claw-arm { transform: translateX(60px); }
-.mach-gym .barbell { animation: lift 1.8s ease-in-out infinite; }
-@keyframes lift { 50% { transform: translateY(-10px); } }
-.mach-errands .ticket-top { transform-origin: 176px 54px; animation: tick-wobble 2s ease-in-out infinite; }
-@keyframes tick-wobble { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+.mach-gym .kb-dumbbell { transform-origin: 44px 376px; animation: lift 1.6s ease-in-out infinite; }
+.mach-gym .kb-needle { transform-origin: 190px 418px; animation: tick-wobble 1.4s ease-in-out infinite; }
+@keyframes lift { 50% { transform: translate(8px, 344px) rotate(-8deg); } }
+.mach-errands .ticket-top { transform-origin: 210px 44px; animation: tick-wobble 2s ease-in-out infinite; }
+@keyframes tick-wobble { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
 .mach-art .stick { transform-box: fill-box; transform-origin: 50% 100%; transition: transform .25s var(--spring); }
 .mcard:hover .mach-art .stick { transform: rotate(-16deg); }
 .mcard:hover .bulb.b0 { animation: bulb .6s steps(2) infinite; }

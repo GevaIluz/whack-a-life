@@ -10,7 +10,7 @@
   const SYNC_KEY = "whack-a-life-sync-v1";
   const GIST_FILENAME = "whack-a-life-sync.json";
   const DEFAULT_GIST_ID = "05466cbaca8486f92f45f3909f9be49e";
-  const APP_BUILD = "2026-11-03-v5";
+  const APP_BUILD = "2026-11-03-v6";
   const BIRTH_DATE = "1998-10-03";
   const DEFAULT_AREAS = ["Work", "MBA", "Apartment", "Money", "Travel", "Health", "Fitness", "Errands", "Family", "Possessions", "Murphy"];
   const URG = {
@@ -187,8 +187,9 @@
     }
     s.areas.forEach((a, i) => {
       const d = AREA_DEFAULTS[(a.name || "").trim().toLowerCase()] || {};
-      if (!THEMES[a.theme]) a.theme = d.theme || "arcade";
-      if (!ICONS[a.icon]) a.icon = d.icon || "star";
+      if (!THEMES[a.theme] || (d.theme && a.theme === "arcade")) a.theme = d.theme || "arcade";
+      if (!ICONS[a.icon] || (d.icon && a.icon === "star")) a.icon = d.icon || "star";
+      if (d.theme && (a.machine === "upright" || a.machine === "claw")) delete a.machine;
       if (typeof a.order !== "number") a.order = i;
       a.updatedAt ??= 0;
     });

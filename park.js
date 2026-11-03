@@ -203,71 +203,155 @@
   };
 
   TYPES.gym = {
-    label: "Power rack", w: 380, h: 438,
-    win: { x: 84, y: 178, w: 212, h: 126, r: "10px" },
-    sign: { x: 96, y: 112, w: 188, h: 38 },
+    label: "Kettlebell & scale", w: 380, h: 438,
+    win: { x: 88, y: 182, w: 204, h: 118, r: "20px" },
+    sign: { x: 104, y: 124, w: 172, h: 36 },
     art: (t) => {
-      const plate = (x, h, col) => `<rect x="${x}" y="${f1(62 - h / 2)}" width="20" height="${h}" rx="6" fill="${col}" ${S}/><rect x="${x + 4}" y="${f1(68 - h / 2)}" width="5" height="${f1(h - 12)}" rx="2.5" fill="#fff" opacity=".3"/>`;
-      const kb = (cx, cy, r, col, kg) => `<path d="M${cx - r * 0.55} ${cy - r * 0.7}V${cy - r * 1.25}A${r * 0.55} ${r * 0.4} 0 0 1 ${cx + r * 0.55} ${cy - r * 1.25}V${cy - r * 0.7}" fill="none" stroke="${INK}" stroke-width="9" stroke-linecap="round"/><path d="M${cx - r * 0.55} ${cy - r * 0.7}V${cy - r * 1.25}A${r * 0.55} ${r * 0.4} 0 0 1 ${cx + r * 0.55} ${cy - r * 1.25}V${cy - r * 0.7}" fill="none" stroke="#C9CED8" stroke-width="4" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col}" ${S}/>${txt(cx, cy + 6, kg, 14, "#fff", 3)}`;
+      const IRON = "#343B52", IRON_LT = "#525C7A", IRON_DK = "#23283B";
       return `
-      <g class="barbell">
-        <rect x="6" y="56" width="368" height="12" rx="6" fill="#C9CED8" ${S}/>
-        ${plate(22, 74, t.secondary)}${plate(44, 96, t.primary)}${plate(66, 112, "#343B52")}
-        ${plate(338, 74, t.secondary)}${plate(316, 96, t.primary)}${plate(294, 112, "#343B52")}
+      <!-- Kettlebell U-handle (horns) -->
+      <path d="M98 158V70Q98 16 190 16Q282 16 282 70V158" fill="none" stroke="${INK}" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M98 158V70Q98 16 190 16Q282 16 282 70V158" fill="none" stroke="${IRON}" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M108 136V70Q108 26 190 26Q272 26 272 70V136" fill="none" stroke="${IRON_LT}" stroke-width="6" stroke-linecap="round" opacity=".65"/>
+      <!-- Red/gold grip wrap at top of handle -->
+      <rect x="148" y="4" width="84" height="24" rx="8" fill="${t.primary}" ${S}/>
+      <path d="M168 6v20M190 6v20M212 6v20" stroke="${t.secondary}" stroke-width="3.5"/>
+      <!-- Draped gym towel on left horn -->
+      <g class="kb-towel">
+        <path d="M80 56Q98 48 116 58V116Q98 124 80 114Z" fill="${t.secondary}" ${S}/>
+        <path d="M84 102H112" stroke="#fff" stroke-width="4"/>
       </g>
-      <rect x="56" y="96" width="22" height="328" rx="6" fill="${t.cab}" ${S}/>
-      <rect x="302" y="96" width="22" height="328" rx="6" fill="${t.cab}" ${S}/>
-      ${[150, 190, 230, 270, 310, 350, 390].map((y) => `<circle cx="67" cy="${y}" r="3" fill="${INK}"/><circle cx="313" cy="${y}" r="3" fill="${INK}"/>`).join("")}
-      <rect x="48" y="104" width="284" height="54" rx="14" fill="${t.primary}" ${S}/>
-      ${hl(66, 112, 248, 6, 0.4)}
-      <rect x="74" y="168" width="232" height="146" rx="16" fill="${INK}"/>
-      <rect x="78" y="330" width="224" height="24" rx="8" fill="${t.secondary}" ${S}/>
-      <rect x="68" y="352" width="244" height="72" rx="10" fill="${dark(t.cab, 0.15)}" ${S}/>
-      ${kb(124, 396, 26, t.primary, "16")}${kb(190, 392, 30, "#343B52", "24")}
-      <g transform="translate(264 364)">
-        <rect x="0" y="12" width="32" height="48" rx="7" fill="#4ECDC4" ${S2}/>
-        <rect x="-3" y="4" width="38" height="10" rx="4" fill="${t.primary}" ${S2}/>
-        <path d="M10 4v-8h12v8" fill="${t.secondary}" ${S2}/>
-        ${hl(6, 20, 5, 30, 0.45)}
+      <!-- Giant spherical kettlebell body -->
+      <path d="M112 378A142 138 0 1 1 268 378Z" fill="${IRON}" ${S}/>
+      <path d="M126 374A128 124 0 0 1 82 192A134 130 0 0 0 254 374Z" fill="${IRON_DK}" opacity=".45"/>
+      <path d="M74 198Q92 146 138 128" fill="none" stroke="${IRON_LT}" stroke-width="9" stroke-linecap="round" opacity=".6"/>
+      <!-- Colored chest banner for machine name -->
+      <rect x="94" y="118" width="192" height="46" rx="16" fill="${t.primary}" ${S}/>
+      ${hl(112, 124, 156, 5, 0.45)}
+      <!-- Recessed screen bezel in kettlebell belly -->
+      <rect x="78" y="172" width="224" height="138" rx="26" fill="${INK}"/>
+      <!-- 24 KG gold badge on lower belly -->
+      <rect x="144" y="320" width="92" height="36" rx="12" fill="${t.secondary}" ${S}/>
+      ${txt(190, 345, "24 KG", 19, INK, 0)}
+      <!-- Left side: Hex dumbbell -->
+      <g class="kb-dumbbell" transform="translate(8 352)">
+        <rect x="18" y="18" width="52" height="12" rx="4" fill="#C9CED8" ${S2}/>
+        <polygon points="4,8 18,2 24,10 24,38 18,46 4,40" fill="${t.primary}" ${S}/>
+        <polygon points="64,10 70,2 84,8 84,40 70,46 64,38" fill="${t.primary}" ${S}/>
       </g>
-      <rect x="26" y="422" width="328" height="14" rx="7" fill="${INK}"/>`;
+      <!-- Right side: Turquoise protein shaker bottle -->
+      <g transform="translate(306 320)">
+        <path d="M6 20H50L44 82Q43 90 35 90H21Q13 90 12 82Z" fill="#4ECDC4" ${S}/>
+        <rect x="2" y="10" width="52" height="12" rx="5" fill="${t.primary}" ${S}/>
+        <path d="M18 10V2H38V10" fill="${t.secondary}" ${S2}/>
+        <path d="M38 34h6M36 48h8M35 62h8" stroke="${INK}" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+        ${hl(12, 28, 6, 44, 0.45)}
+      </g>
+      <!-- Weight scale platform at base -->
+      <path d="M36 426L52 380H328L344 426Z" fill="#FFF6E2" ${S}/>
+      <rect x="64" y="388" width="90" height="28" rx="6" fill="${t.cab}" ${S2}/>
+      <rect x="226" y="388" width="90" height="28" rx="6" fill="${t.cab}" ${S2}/>
+      <!-- Scale speedometer dial in center -->
+      <path d="M162 420A28 28 0 0 1 218 420Z" fill="#fff" ${S}/>
+      <line class="kb-needle" x1="190" y1="418" x2="202" y2="398" stroke="#F0473E" stroke-width="3.5" stroke-linecap="round"/>
+      <circle cx="190" cy="418" r="4" fill="${INK}"/>
+      <rect x="24" y="424" width="332" height="12" rx="6" fill="${INK}"/>`;
     },
   };
 
   TYPES.errands = {
-    label: "Errand booth", w: 360, h: 436,
-    win: { x: 68, y: 178, w: 216, h: 120, r: "10px" },
-    sign: { x: 76, y: 118, w: 200, h: 36 },
+    label: "Shopping cart", w: 396, h: 438,
+    win: { x: 96, y: 174, w: 216, h: 118, r: "12px" },
+    sign: { x: 108, y: 118, w: 192, h: 36 },
     art: (t) => {
-      const stripes = [...Array(7)].map((_, i) => `<rect x="${44 + i * 38}" y="58" width="38" height="46" fill="${i % 2 ? "#fff" : t.primary}"/>`).join("");
-      const scallops = [...Array(7)].map((_, i) => `<path d="M${44 + i * 38} 102a19 14 0 0 0 38 0Z" fill="${i % 2 ? "#fff" : t.primary}" ${S2}/>`).join("");
+      const CHROME = "#D8E0EC", CHROME_DK = "#9FB0C7";
       return `
+      <!-- Items overflowing out of the top of the shopping cart -->
+      <!-- 1. Brown grocery bag with French baguette & leafy greens (left) -->
+      <g transform="translate(68 22)">
+        <!-- Leafy greens -->
+        <circle cx="24" cy="22" r="14" fill="#2FCB7A" ${S}/>
+        <circle cx="40" cy="16" r="16" fill="#5FAE4F" ${S}/>
+        <circle cx="56" cy="24" r="13" fill="#2FCB7A" ${S}/>
+        <!-- French baguette -->
+        <g transform="rotate(-18 26 30)">
+          <rect x="6" y="-8" width="28" height="68" rx="14" fill="#F4A261" ${S}/>
+          <path d="M12 6l14 6M12 20l14 6M12 34l14 6" stroke="#B45309" stroke-width="2.5" stroke-linecap="round"/>
+        </g>
+        <!-- Paper grocery bag -->
+        <path d="M4 34L12 30L20 34L28 30L36 34L44 30L52 34L60 30L68 34V96H4Z" fill="#E7BC80" ${S}/>
+        <path d="M14 44V86" stroke="#C9975B" stroke-width="4" stroke-linecap="round"/>
+      </g>
+      <!-- 2. Cardboard parcel box + red #42 queue ticket (center) -->
+      <g transform="translate(148 34)">
+        <rect x="0" y="18" width="88" height="68" rx="6" fill="#D9A266" ${S}/>
+        <rect x="36" y="19" width="16" height="66" fill="#F6E2BC" ${S2}/>
+        <rect x="10" y="32" width="20" height="14" rx="2" fill="#fff" ${S1}/>
+      </g>
       <g class="ticket-top">
-        <rect x="128" y="12" width="96" height="42" rx="10" fill="#F0473E" ${S}/>
-        <rect x="140" y="20" width="72" height="26" rx="5" fill="#FFF6E2" ${S2}/>
-        ${txt(176, 39, "NOW #42", 15, "#F0473E", 0)}
+        <path d="M174 6H246V44L238 39L230 44L222 39L214 44L206 39L198 44L190 39L182 44L174 39Z" fill="#F0473E" ${S}/>
+        <rect x="183" y="12" width="54" height="20" rx="4" fill="#FFF6E2" ${S1}/>
+        ${txt(210, 27, "#42", 15, "#F0473E", 0)}
       </g>
-      <rect x="48" y="100" width="256" height="322" rx="14" fill="${t.cab}" ${S}/>
-      <g>${stripes}<rect x="44" y="58" width="266" height="46" rx="10" fill="none" ${S}/>${scallops}</g>
-      <rect x="64" y="112" width="224" height="48" rx="12" fill="${t.secondary}" ${S}/>
-      <rect x="58" y="168" width="236" height="140" rx="14" fill="${INK}"/>
-      <g class="flag" transform="translate(12 200)">
-        <rect x="0" y="28" width="36" height="52" rx="10" fill="#F0473E" ${S}/>
-        <rect x="6" y="40" width="24" height="6" rx="3" fill="${INK}"/>
-        <path d="M18 28V4" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
-        <path d="M18 4h20l-5 8 5 8H18Z" fill="${t.secondary}" ${S2}/>
+      <!-- 3. White mail envelope & yellow checklist (right) -->
+      <g transform="translate(242 28) rotate(8 42 40)">
+        <rect x="18" y="0" width="66" height="82" rx="6" fill="${t.secondary}" ${S}/>
+        <rect x="34" y="-6" width="34" height="12" rx="4" fill="${CHROME}" ${S2}/>
+        <path d="M28 24l6 6 12-12M28 44l6 6 12-12" fill="none" stroke="#16884C" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M52 24h22M52 44h18" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>
       </g>
-      <rect x="64" y="322" width="224" height="86" rx="10" fill="#FFF6E2" ${S}/>
-      <path d="M84 346l8 8 16-16M84 378l8 8 16-16" fill="none" stroke="#2FCB7A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M122 346h90M122 378h72" stroke="${INK}" stroke-width="5" stroke-linecap="round" opacity=".65"/>
-      <g transform="translate(296 322)">
-        <path d="M8 22Q24 -2 40 22" fill="none" stroke="${INK}" stroke-width="4"/>
-        <rect x="0" y="20" width="52" height="88" rx="8" fill="#E7BC80" ${S}/>
-        <rect x="10" y="4" width="14" height="22" rx="6" fill="#F4A261" ${S2}/>
-        <circle cx="26" cy="60" r="10" fill="${t.secondary}" ${S2}/>
-        <circle cx="26" cy="60" r="3.5" fill="${INK}"/>
+      <g transform="translate(226 52) rotate(-7 36 24)">
+        <rect x="0" y="0" width="74" height="48" rx="6" fill="#fff" ${S}/>
+        <path d="M4 4L37 28L70 4" fill="none" stroke="${INK}" stroke-width="2.5" stroke-linejoin="round"/>
+        <circle cx="37" cy="24" r="7" fill="#F0473E" ${S1}/>
       </g>
-      <rect x="22" y="418" width="316" height="14" rx="7" fill="${INK}"/>`;
+
+      <!-- Left push handlebar of shopping cart -->
+      <path d="M56 122H24Q14 122 14 134V168Q14 180 28 180H64" fill="none" stroke="${INK}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M56 122H24Q14 122 14 134V168Q14 180 28 180H64" fill="none" stroke="${CHROME}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="4" y="102" width="22" height="52" rx="11" fill="#F0473E" ${S}/>
+      ${hl(9, 110, 5, 32, 0.45)}
+
+      <!-- Trapezoidal Shopping Cart Wire Basket -->
+      <polygon points="52,106 356,106 326,336 82,336" fill="${light(t.primary, 0.72)}" ${S}/>
+      <!-- Wire mesh grid lines inside basket -->
+      <path d="M92 106L112 336M134 106L146 336M274 106L262 336M316 106L296 336" stroke="${CHROME_DK}" stroke-width="3" opacity=".65"/>
+      <path d="M60 166H348M68 232H340M76 298H332" stroke="${CHROME_DK}" stroke-width="3" opacity=".65"/>
+      <!-- Outer heavy chrome basket frame & corner bumpers -->
+      <polygon points="52,106 356,106 326,336 82,336" fill="none" stroke="${INK}" stroke-width="11" stroke-linejoin="round"/>
+      <polygon points="52,106 356,106 326,336 82,336" fill="none" stroke="${CHROME}" stroke-width="5" stroke-linejoin="round"/>
+      <!-- Top rim bar & plastic corner caps -->
+      <rect x="42" y="96" width="324" height="16" rx="8" fill="${t.primary}" ${S}/>
+      ${hl(58, 100, 290, 4, 0.45)}
+      <circle cx="82" cy="336" r="10" fill="${t.primary}" ${S2}/>
+      <circle cx="326" cy="336" r="10" fill="${t.primary}" ${S2}/>
+
+      <!-- Cart front nose-plate sign (Errands) -->
+      <rect x="98" y="114" width="212" height="44" rx="12" fill="${t.cab}" ${S}/>
+      <rect x="104" y="118" width="200" height="36" rx="9" fill="${t.primary}" ${S2}/>
+      <!-- Screen bezel mounted on cart front -->
+      <rect x="86" y="164" width="236" height="138" rx="18" fill="${INK}"/>
+      <!-- Bottom basket bumper strip -->
+      <rect x="114" y="310" width="180" height="16" rx="8" fill="${t.secondary}" ${S2}/>
+
+      <!-- Lower steel undercarriage frame -->
+      <path d="M104 338L86 382H328L304 338" fill="none" stroke="${INK}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M104 338L86 382H328L304 338" fill="none" stroke="${CHROME}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Caster Forks & Big Rolling Wheels -->
+      <path d="M104 382L116 408M292 382L304 408" stroke="${INK}" stroke-width="11" stroke-linecap="round"/>
+      <path d="M104 382L116 408M292 382L304 408" stroke="${CHROME}" stroke-width="5" stroke-linecap="round"/>
+      <g class="cart-wheel w1">
+        <circle cx="116" cy="408" r="24" fill="#343B52" ${S}/>
+        <circle cx="116" cy="408" r="12" fill="${t.secondary}" ${S2}/>
+        <circle cx="116" cy="408" r="4" fill="${INK}"/>
+      </g>
+      <g class="cart-wheel w2">
+        <circle cx="304" cy="408" r="24" fill="#343B52" ${S}/>
+        <circle cx="304" cy="408" r="12" fill="${t.secondary}" ${S2}/>
+        <circle cx="304" cy="408" r="4" fill="${INK}"/>
+      </g>
+      <rect x="44" y="428" width="320" height="8" rx="4" fill="${INK}" opacity=".25"/>`;
     },
   };
 
