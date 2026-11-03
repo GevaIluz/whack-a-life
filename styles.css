@@ -1082,3 +1082,150 @@ button, a, label, .mcard, .mole { touch-action: manipulation; }
   }
 }
 
+/* =========================================================
+   Recurring Combo Moles, Pinned Machine Goals & Live Refresh
+   ========================================================= */
+.refresh-btn.spinning .ic { animation: spin .9s linear infinite; }
+
+/* Repeat controls in mole dialog & quick-add */
+.repeat-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.repeat-row .seg { flex: 1; min-width: 240px; }
+.repeat-target {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 12px;
+  background: var(--soft); border: 2.5px solid var(--ink);
+  font-weight: 700; font-size: 14px; color: var(--ink);
+}
+.repeat-target .input.sm {
+  width: 58px; height: 32px; padding: 0 6px; text-align: center;
+  font: 16px/1 var(--display); border-radius: 9px;
+}
+.row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 4px; }
+@media (max-width: 520px) { .row-3 { grid-template-columns: 1fr 1fr; } .row-3 > :last-child { grid-column: 1 / -1; } }
+
+.qa-repeat {
+  height: 44px; padding: 0 10px; border-radius: 13px;
+  border: 2.5px solid var(--ink); background: #fff; color: var(--ink);
+  font-weight: 600; font-size: 14px; cursor: pointer;
+}
+.qa-repeat:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Combo pips badge on holes & lists */
+.combo-badge {
+  position: absolute; z-index: 4; top: -8px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 99px;
+  background: #FFF9DB; color: var(--ink);
+  border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink);
+  font: 12.5px/1 var(--display); letter-spacing: .02em; white-space: nowrap;
+}
+.combo-badge .ic { width: 12px; height: 12px; stroke-width: 3; color: var(--ink-2); }
+.combo-pips { display: inline-flex; align-items: center; gap: 3.5px; }
+.pip {
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 2px solid var(--ink); background: #fff;
+  transition: transform .2s var(--spring), background-color .2s;
+}
+.pip.on { background: var(--green); transform: scale(1.08); }
+.combo-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 99px;
+  background: #FFF6D6; border: 2px solid var(--ink);
+  font: 12px/1 var(--display); color: var(--ink); white-space: nowrap;
+}
+.combo-chip .ic { width: 12px; height: 12px; stroke-width: 2.8; }
+
+.mole.combo-hit { animation: combo-bounce .42s var(--spring); }
+@keyframes combo-bounce {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(42%) scale(1.12, .76); }
+  65% { transform: translateY(-8%) scale(.96, 1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Pinned Machine Goal banner inside a machine */
+.goal-banner {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  margin: 0 18px 10px; padding: 10px 14px; border-radius: 18px;
+  background: rgba(255, 255, 255, .94); border: 3px solid var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
+}
+.goal-main { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 210px; }
+.goal-ic {
+  display: grid; place-items: center; width: 38px; height: 38px; flex: none;
+  border-radius: 12px; background: var(--yellow); color: var(--ink);
+  border: 2.5px solid var(--ink); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .55);
+}
+.goal-ic .ic { width: 20px; height: 20px; stroke-width: 2.6; }
+.goal-copy { flex: 1; min-width: 0; }
+.goal-eyebrow {
+  display: flex; align-items: center; gap: 6px;
+  font: 11.5px/1 var(--display); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2);
+}
+.goal-title {
+  display: block; margin-top: 2px;
+  font: 18px/1.2 var(--display); letter-spacing: .01em; color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.goal-progress-wrap {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.goal-bar {
+  width: 140px; height: 14px; padding: 2px;
+  border-radius: 99px; background: var(--soft); border: 2.5px solid var(--ink); overflow: hidden;
+}
+.goal-bar > span {
+  display: block; height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--yellow), var(--green));
+  transition: width .3s var(--ease);
+}
+.goal-stat { font: 15px/1 var(--display); color: var(--ink); white-space: nowrap; }
+.goal-actions { display: inline-flex; align-items: center; gap: 6px; }
+.goal-step {
+  display: inline-grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 10px;
+  border: 2.5px solid var(--ink); background: #fff; color: var(--ink);
+  box-shadow: 0 2px 0 var(--ink); cursor: pointer;
+}
+.goal-step:hover { background: var(--yellow); }
+.goal-step:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--ink); }
+.goal-step .ic { width: 15px; height: 15px; stroke-width: 3; }
+
+.pl-goal {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 7px; border-radius: 8px;
+  background: #FFF8D6; border: 1.8px solid var(--ink);
+  font-size: 11.5px; font-weight: 700; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pl-goal .ic { width: 12px; height: 12px; flex: none; color: #D97706; stroke-width: 2.8; }
+.pl-goal span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Resting / completed-this-cycle moles section */
+.resting-sec {
+  margin-top: 14px; padding-top: 12px;
+  border-top: 2px dashed var(--soft-line);
+}
+.resting-head {
+  display: flex; align-items: center; gap: 6px;
+  font: 13.5px/1.2 var(--display); letter-spacing: .02em; color: var(--ink-2);
+  margin: 0 0 8px;
+}
+.resting-head .ic { width: 15px; height: 15px; color: var(--green); stroke-width: 3; }
+.resting-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.resting-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 12px;
+  background: #F3FAF5; border: 2px solid #BEE5C8; color: var(--ink-2);
+}
+.resting-row .q-title { flex: 1; text-align: left; background: none; border: 0; font-weight: 600; color: var(--ink); cursor: pointer; padding: 0; }
+.resting-note { font-size: 12px; font-weight: 600; color: #1E7E45; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .goal-banner { margin: 0 10px 10px; padding: 9px 11px; gap: 10px; }
+  .goal-bar { width: 100px; }
+  .pl-goal { display: none; }
+}
+
+

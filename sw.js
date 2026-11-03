@@ -1,5 +1,5 @@
-/* Whack-a-Life Service Worker — offline support & auto-update */
-const CACHE_NAME = "whack-a-life-shell-v4";
+/* Whack-a-Life Service Worker — offline support & instant auto-update */
+const CACHE_NAME = "whack-a-life-shell-v5";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -19,7 +19,10 @@ const SHELL_ASSETS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => Promise.all(SHELL_ASSETS.map((u) => fetch(u, { cache: "no-cache" }).then((r) => (r.ok ? cache.put(u, r) : null)).catch(() => null))))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -31,13 +34,23 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // Never cache GitHub API (Gist sync) or translation API calls
-  if (url.hostname === "api.github.com" || url.hostname.includes("mymemory.translated.net")) {
+  // Never cache GitHub API (Gist sync), version.json, or translation API calls
+  if (
+    url.hostname === "api.github.com" ||
+    url.hostname.includes("mymemory.translated.net") ||
+    url.pathname.endsWith("/version.json")
+  ) {
     return;
   }
 
@@ -56,10 +69,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Same-origin app shell: Network-first with cache fallback so code updates apply immediately when online
+  // Same-origin app shell: Network-first with cache: "no-cache" so deployed updates apply immediately when online
   if (url.origin === self.location.origin) {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-cache" })
         .then((res) => {
           if (res && res.ok) {
             const clone = res.clone();

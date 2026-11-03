@@ -53,11 +53,54 @@
         <legend class="field-label">Urgency</legend>
         <div class="seg" data-urgency-seg></div>
       </fieldset>
+      <fieldset class="seg-wrap">
+        <legend class="field-label">Repeat <span class="opt">for habits &amp; recurring tasks</span></legend>
+        <div class="repeat-row">
+          <div class="seg" data-repeat-seg></div>
+          <label class="repeat-target" id="mole-repeat-target-wrap" hidden>
+            <input id="mole-repeat-target" name="repeatTarget" type="number" min="1" max="14" value="3" class="input sm" />
+            <span id="mole-repeat-unit">× / week</span>
+          </label>
+        </div>
+      </fieldset>
       <footer class="sheet-foot">
         <button type="button" class="btn btn-ghost danger" id="mole-delete" hidden><i data-icon="trash-2"></i>Delete</button>
         <span class="spacer"></span>
         <button type="button" class="btn btn-white" data-close>Cancel</button>
         <button type="submit" class="btn btn-red" id="mole-save">Pop it</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Machine Goal editor -->
+  <dialog id="goal-dialog" class="sheet" aria-labelledby="goal-dialog-title">
+    <form id="goal-form" method="dialog">
+      <header class="sheet-head">
+        <h2 id="goal-dialog-title">Machine goal</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+      </header>
+      <p class="sheet-sub">Pin an ongoing goal to the top of this machine (like <b>Lose at least 5 kg</b> or <b>Save ₪20,000</b>). It tracks your progress without blocking "All clear!" when you finish this week's moles.</p>
+      <label class="field-label" for="goal-title">Goal</label>
+      <input id="goal-title" name="title" class="input" required autocomplete="off" maxlength="120" placeholder="e.g. Lose at least 5 kg" />
+      <div class="row-3">
+        <div>
+          <label class="field-label" for="goal-current">Progress</label>
+          <input id="goal-current" name="current" type="number" step="any" class="input" value="0" />
+        </div>
+        <div>
+          <label class="field-label" for="goal-target">Target <span class="opt">optional</span></label>
+          <input id="goal-target" name="target" type="number" step="any" min="0" class="input" placeholder="e.g. 5" />
+        </div>
+        <div>
+          <label class="field-label" for="goal-unit">Unit <span class="opt">optional</span></label>
+          <input id="goal-unit" name="unit" class="input" maxlength="16" placeholder="kg, ₪, km…" />
+        </div>
+      </div>
+      <footer class="sheet-foot">
+        <button type="button" class="btn btn-ghost danger" id="goal-delete" hidden><i data-icon="trash-2"></i>Remove goal</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-white" data-close>Cancel</button>
+        <button type="submit" class="btn btn-green" id="goal-save">Save goal</button>
       </footer>
     </form>
   </dialog>

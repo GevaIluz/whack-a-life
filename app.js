@@ -10,6 +10,7 @@
   const SYNC_KEY = "whack-a-life-sync-v1";
   const GIST_FILENAME = "whack-a-life-sync.json";
   const DEFAULT_GIST_ID = "05466cbaca8486f92f45f3909f9be49e";
+  const APP_BUILD = "2026-11-03-v5";
   const BIRTH_DATE = "1998-10-03";
   const DEFAULT_AREAS = ["Work", "MBA", "Apartment", "Money", "Travel", "Health", "Fitness", "Errands", "Family", "Possessions", "Murphy"];
   const URG = {
@@ -18,6 +19,12 @@
     high: { label: "Urgent", weight: 4, mood: "angry" },
   };
   const URG_ORDER = ["low", "medium", "high"];
+  const REPEAT_OPTS = [
+    { id: "none", label: "One-time" },
+    { id: "day", label: "Daily", unit: "× / day", resetLabel: "tomorrow" },
+    { id: "week", label: "Weekly", unit: "× / week", resetLabel: "Sunday" },
+    { id: "month", label: "Monthly", unit: "× / month", resetLabel: "next month" },
+  ];
   const WORDS = ["BONK!", "WHACK!", "POW!", "SMASH!", "BAM!", "DONE!"];
   const PRACTICE = ["Answer emails", "Laundry", "Book dentist", "Pay bills", "Groceries", "Call mom", "Walk Murphy", "Submit report", "Clean desk", "Renew passport", "Gym session", "Read chapter 4"];
   const PLAY_SECONDS = 30;
@@ -41,9 +48,43 @@
     const x = new Date(d);
     return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
   };
+  const weekKey = (d = new Date()) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    x.setDate(x.getDate() - x.getDay()); // Sunday start of week
+    return dayKey(x);
+  };
+  const monthKey = (d = new Date()) => {
+    const x = new Date(d);
+    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`;
+  };
+  const periodKey = (period, d = new Date()) =>
+    period === "day" ? dayKey(d) : period === "month" ? monthKey(d) : weekKey(d);
   const keyToDate = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
   const addDays = (k, n) => { const d = keyToDate(k); d.setDate(d.getDate() + n); return dayKey(d); };
   const fmtDate = (k) => keyToDate(k).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+  function syncMoleCycle(m, now = new Date()) {
+    if (!m.repeat || !m.repeat.period || m.repeat.period === "none") {
+      delete m.repeat;
+      delete m.cycleKey;
+      delete m.cycleHits;
+      return false;
+    }
+    m.repeat.target = Math.max(1, Math.min(14, Number(m.repeat.target) || 1));
+    const pk = periodKey(m.repeat.period, now);
+    if (m.cycleKey !== pk) {
+      m.cycleKey = pk;
+      m.cycleHits = 0;
+      return true;
+    }
+    m.cycleHits = Math.max(0, Number(m.cycleHits) || 0);
+    return false;
+  }
+  const isMoleActive = (m) => {
+    syncMoleCycle(m);
+    return !m.repeat || (m.cycleHits || 0) < (m.repeat.target || 1);
+  };
 
   // ---------------- state ----------------
   function freshState() {
@@ -58,6 +99,7 @@
       addedMurphy: true,
       addedFitness: true,
       addedErrands: true,
+      migratedGoalsV1: true,
     };
   }
   function migrate(s) {
@@ -105,6 +147,44 @@
       }
       s.addedErrands = true;
     }
+    if (!s.migratedGoalsV1) {
+      const fit = s.areas.find((a) => (a.name || "").trim().toLowerCase() === "fitness");
+      if (fit && (s.moles.length > 0 || s.history.length > 0)) {
+        const now = Date.now();
+        const loseIdx = s.moles.findIndex((m) => /lose.*5\s*kg/i.test(m.title));
+        if (loseIdx >= 0) {
+          const [removed] = s.moles.splice(loseIdx, 1);
+          s.deletedIds[removed.id] = now;
+        }
+        if (!fit.goal) {
+          fit.goal = { title: "Lose at least 5 kg", current: 0, target: 5, unit: "kg", step: 0.5, updatedAt: now };
+          fit.goalUpdatedAt = now;
+          fit.updatedAt = Math.max(fit.updatedAt || 0, now);
+        }
+        let workoutMole = s.moles.find((m) => m.areaId === fit.id && /\b(work\s*out|workout)\b/i.test(m.title));
+        if (workoutMole) {
+          workoutMole.title = "Workout";
+          workoutMole.repeat = { period: "week", target: 3 };
+          workoutMole.cycleKey = weekKey();
+          workoutMole.cycleHits ??= 0;
+          workoutMole.updatedAt = Math.max(workoutMole.updatedAt || 0, now);
+        } else if (!s.deletedIds["seed-fitness-workout-3x"]) {
+          s.moles.push({
+            id: "seed-fitness-workout-3x",
+            createdAt: now,
+            updatedAt: now,
+            areaId: fit.id,
+            title: "Workout",
+            due: null,
+            urgency: "medium",
+            repeat: { period: "week", target: 3 },
+            cycleKey: weekKey(),
+            cycleHits: 0,
+          });
+        }
+        s.migratedGoalsV1 = true;
+      }
+    }
     s.areas.forEach((a, i) => {
       const d = AREA_DEFAULTS[(a.name || "").trim().toLowerCase()] || {};
       if (!THEMES[a.theme]) a.theme = d.theme || "arcade";
@@ -112,10 +192,27 @@
       if (typeof a.order !== "number") a.order = i;
       a.updatedAt ??= 0;
     });
-    s.moles.forEach((m) => { m.updatedAt ??= m.createdAt || 0; });
+    s.moles.forEach((m) => {
+      m.updatedAt ??= m.createdAt || 0;
+      syncMoleCycle(m);
+    });
     s.history.forEach((h) => { h.moleId ||= h.id; });
-    s.version = 4;
+    s.version = 5;
     return s;
+  }
+  function mergeAreaRecord(ra, la, id) {
+    const base = (la.updatedAt || 0) >= (ra.updatedAt || 0) ? { ...ra, ...la, id } : { ...la, ...ra, id };
+    const rGoalTs = ra.goalUpdatedAt || ra.goal?.updatedAt || 0;
+    const lGoalTs = la.goalUpdatedAt || la.goal?.updatedAt || 0;
+    if (lGoalTs >= rGoalTs) {
+      base.goal = la.goal || null;
+      base.goalUpdatedAt = lGoalTs;
+    } else {
+      base.goal = ra.goal || null;
+      base.goalUpdatedAt = rGoalTs;
+    }
+    if (!base.goal) delete base.goal;
+    return base;
   }
   function mergeStates(localRaw, remoteRaw) {
     const L = migrate(structuredClone(localRaw)), R = migrate(structuredClone(remoteRaw));
@@ -135,7 +232,7 @@
     for (const a of L.areas) {
       if (areaMap.has(a.id)) {
         const ra = areaMap.get(a.id);
-        if ((a.updatedAt || 0) >= (ra.updatedAt || 0)) areaMap.set(a.id, { ...ra, ...a });
+        areaMap.set(a.id, mergeAreaRecord(ra, a, a.id));
       } else {
         const sameNameId = nameMap.get(norm(a.name));
         if (sameNameId) {
@@ -144,11 +241,11 @@
           const keepRemoteId = (rMoleCount.get(sameNameId) || 0) > 0 || (ra.updatedAt || 0) >= (a.updatedAt || 0);
           if (keepRemoteId) {
             idRemap.set(a.id, sameNameId);
-            if ((a.updatedAt || 0) > (ra.updatedAt || 0)) areaMap.set(sameNameId, { ...a, id: sameNameId });
+            areaMap.set(sameNameId, mergeAreaRecord(ra, a, sameNameId));
           } else {
             idRemap.set(sameNameId, a.id);
             areaMap.delete(sameNameId);
-            areaMap.set(a.id, { ...ra, ...a, id: a.id });
+            areaMap.set(a.id, mergeAreaRecord(ra, a, a.id));
             nameMap.set(norm(a.name), a.id);
           }
         } else {
@@ -167,6 +264,7 @@
     // Merge history (whacked moles), skipping any undone history entries
     const moleUpdatedMap = new Map();
     for (const m of [...R.moles, ...L.moles]) {
+      if (m.repeat) continue;
       const ts = m.updatedAt || m.createdAt || 0;
       moleUpdatedMap.set(m.id, Math.max(moleUpdatedMap.get(m.id) || 0, ts));
     }
@@ -176,14 +274,16 @@
     for (const h of [...R.history, ...L.history]) {
       if (deletedIds[h.id]) continue;
       const entry = { ...h, areaId: remapId(h.areaId), moleId: h.moleId || h.id };
-      if ((moleUpdatedMap.get(entry.moleId) || 0) > entry.whackedAt) continue;
-      const key = entry.moleId || entry.id;
+      if (!entry.comboHit && (moleUpdatedMap.get(entry.moleId) || 0) > entry.whackedAt) continue;
+      const key = entry.comboHit ? entry.id : (entry.moleId || entry.id);
       const prev = histMap.get(key);
       if (!prev || entry.whackedAt < prev.whackedAt) histMap.set(key, entry);
-      whackedMoleIds.add(entry.moleId);
-      whackedMoleIds.add(entry.id);
-      const tKey = `${entry.areaId}::${norm(entry.title)}`;
-      whackedTitleTime.set(tKey, Math.max(whackedTitleTime.get(tKey) || 0, entry.whackedAt || 0));
+      if (!entry.comboHit) {
+        whackedMoleIds.add(entry.moleId);
+        whackedMoleIds.add(entry.id);
+        const tKey = `${entry.areaId}::${norm(entry.title)}`;
+        whackedTitleTime.set(tKey, Math.max(whackedTitleTime.get(tKey) || 0, entry.whackedAt || 0));
+      }
     }
     const history = [...histMap.values()].sort((a, b) => b.whackedAt - a.whackedAt);
 
@@ -193,10 +293,12 @@
     for (const m of [...R.moles, ...L.moles]) {
       const item = { ...m, areaId: remapId(m.areaId), updatedAt: m.updatedAt || m.createdAt || 0 };
       if (!validAreaIds.has(item.areaId)) continue;
-      if (whackedMoleIds.has(item.id)) continue;
-      const tKey = `${item.areaId}::${norm(item.title)}`;
-      if ((whackedTitleTime.get(tKey) || 0) >= item.updatedAt && item.updatedAt > 0) continue;
       if (deletedIds[item.id] && deletedIds[item.id] > item.updatedAt) continue;
+      const tKey = `${item.areaId}::${norm(item.title)}`;
+      if (!item.repeat) {
+        if (whackedMoleIds.has(item.id)) continue;
+        if ((whackedTitleTime.get(tKey) || 0) >= item.updatedAt && item.updatedAt > 0) continue;
+      }
       const existingIdForTitle = titleKeyMap.get(tKey);
       const canonicalId = existingIdForTitle || item.id;
       const prev = moleMap.get(canonicalId);
@@ -216,7 +318,7 @@
     };
     const appliedSeeds = [...new Set([...(L.appliedSeeds || []), ...(R.appliedSeeds || [])])];
     return migrate({
-      version: 4,
+      version: 5,
       updatedAt: Math.max(L.updatedAt || 0, R.updatedAt || 0),
       areas,
       moles,
@@ -226,6 +328,7 @@
       addedMurphy: L.addedMurphy || R.addedMurphy,
       addedFitness: L.addedFitness || R.addedFitness,
       addedErrands: L.addedErrands || R.addedErrands,
+      migratedGoalsV1: L.migratedGoalsV1 || R.migratedGoalsV1,
       appliedSeeds,
     });
   }
@@ -257,7 +360,83 @@
   const areaById = (id) => state.areas.find((a) => a.id === id);
   const themeOf = (a) => THEMES[a?.theme] || THEMES.arcade;
   const themeVars = (t) => `--c1:${t.primary};--c2:${t.secondary};--cab:${t.cab};--sky1:${t.sky[0]};--sky2:${t.sky[1]};--g1:${t.ground[0]};--g2:${t.ground[1]};--rim:${t.rim}`;
-  const molesOf = (areaId) => sortMoles(state.moles.filter((m) => m.areaId === areaId));
+  const activeMoles = () => state.moles.filter(isMoleActive);
+  const molesOf = (areaId) => sortMoles(state.moles.filter((m) => m.areaId === areaId && isMoleActive(m)));
+  const restingMolesOf = (areaId) => state.moles.filter((m) => m.areaId === areaId && !isMoleActive(m));
+
+  function repeatMeta(rep) {
+    if (!rep || !rep.period || rep.period === "none") return null;
+    const opt = REPEAT_OPTS.find((o) => o.id === rep.period) || REPEAT_OPTS[2];
+    const target = Math.max(1, Number(rep.target) || 1);
+    const shortPeriod = rep.period === "day" ? "day" : rep.period === "month" ? "mo" : "wk";
+    return {
+      period: rep.period,
+      target,
+      label: target > 1 ? `${target}× / ${shortPeriod}` : opt.label,
+      resetLabel: opt.resetLabel || "next cycle",
+    };
+  }
+  function comboBadgeHTML(m) {
+    const rm = repeatMeta(m.repeat);
+    if (!rm) return "";
+    const hits = Math.min(rm.target, m.cycleHits || 0);
+    if (rm.target > 1 && rm.target <= 7) {
+      const pips = Array.from({ length: rm.target }, (_, k) => `<i class="pip${k < hits ? " on" : ""}"></i>`).join("");
+      return `<span class="combo-badge" title="${hits}/${rm.target} done this ${rm.period} (resets ${rm.resetLabel})">${icon("repeat")}<span class="combo-pips">${pips}</span><b>${hits}/${rm.target}</b></span>`;
+    }
+    return `<span class="combo-badge" title="Repeats ${rm.label.toLowerCase()} (resets ${rm.resetLabel})">${icon("repeat")}<b>${rm.target > 1 ? `${hits}/${rm.target}` : rm.label}</b></span>`;
+  }
+  function comboChipHTML(m) {
+    const rm = repeatMeta(m.repeat);
+    if (!rm) return "";
+    const hits = Math.min(rm.target, m.cycleHits || 0);
+    return `<span class="combo-chip" title="Resets ${rm.resetLabel}">${icon("repeat")}${rm.target > 1 ? `${hits}/${rm.target} · ${rm.label}` : rm.label}</span>`;
+  }
+  const fmtNum = (n) => {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return "0";
+    return Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, "");
+  };
+  function goalSummaryText(g) {
+    if (!g || !g.title) return "";
+    const hasTarget = Number(g.target) > 0;
+    if (!hasTarget) return g.title;
+    const unit = g.unit ? ` ${g.unit}` : "";
+    return `${g.title} (${fmtNum(g.current || 0)}/${fmtNum(g.target)}${unit})`;
+  }
+  function goalBannerHTML(a) {
+    const g = a.goal;
+    if (!g || !g.title) return "";
+    const hasTarget = Number(g.target) > 0;
+    const cur = Number(g.current) || 0;
+    const tgt = Number(g.target) || 0;
+    const pct = hasTarget ? Math.max(0, Math.min(100, Math.round((cur / tgt) * 100))) : 0;
+    const unit = g.unit ? ` ${esc(g.unit)}` : "";
+    return `<div class="goal-banner" role="region" aria-label="Machine goal">
+      <div class="goal-main">
+        <span class="goal-ic">${icon("trophy")}</span>
+        <div class="goal-copy">
+          <span class="goal-eyebrow">${icon("target")}Machine goal</span>
+          <b class="goal-title" dir="auto">${esc(g.title)}</b>
+        </div>
+      </div>
+      <div class="goal-progress-wrap">
+        ${hasTarget ? `
+          <span class="goal-bar" title="${pct}%"><span style="width:${Math.max(pct, 4)}%"></span></span>
+          <span class="goal-stat">${fmtNum(cur)} / ${fmtNum(tgt)}${unit}</span>
+          <div class="goal-actions">
+            <button type="button" class="goal-step" data-act="goal-minus" title="Step back">${icon("minus")}</button>
+            <button type="button" class="goal-step" data-act="goal-plus" title="Add progress">${icon("plus")}</button>
+            <button type="button" class="goal-step" data-act="goal-edit" title="Edit goal">${icon("pencil")}</button>
+          </div>
+        ` : `
+          <div class="goal-actions">
+            <button type="button" class="goal-step" data-act="goal-edit" title="Edit goal">${icon("pencil")}</button>
+          </div>
+        `}
+      </div>
+    </div>`;
+  }
 
   // ---------------- level = age ----------------
   function levelInfo() {
@@ -287,7 +466,7 @@
     if (st === "overdue") w += 4; else if (st === "today") w += 2;
     return w;
   }
-  const areaCalm = (id) => Math.max(0, Math.round(100 - state.moles.filter((m) => m.areaId === id).reduce((s, m) => s + moleLoad(m), 0) * 6));
+  const areaCalm = (id) => Math.max(0, Math.round(100 - state.moles.filter((m) => m.areaId === id && isMoleActive(m)).reduce((s, m) => s + moleLoad(m), 0) * 6));
   const lifeCalm = () => state.areas.length ? Math.round(state.areas.reduce((s, a) => s + areaCalm(a.id), 0) / state.areas.length) : 100;
   function calmInfo(c) {
     if (c >= 95) return { label: "Quiet", color: "#3CCB6E" };
@@ -391,7 +570,8 @@
       document.title = "Free Play · Whack-a-Life";
     } else {
       renderHall();
-      document.title = state.moles.length ? `(${state.moles.length}) Whack-a-Life` : "Whack-a-Life";
+      const openCount = activeMoles().length;
+      document.title = openCount ? `(${openCount}) Whack-a-Life` : "Whack-a-Life";
     }
     justAdded = null;
     if ($("#stats-dialog").open) renderStats();
@@ -401,7 +581,7 @@
   function hudHTML() {
     const lv = levelInfo(), today = doneOn(dayKey());
     return `<div class="hud" role="group" aria-label="Player">
-      <div class="hud-level" title="Your level is your age. It goes up on your birthday.">
+      <div class="hud-level" title="Your level is your age (${lv.month} of this level).">
         <span class="lv-badge"><small>LV</small>${lv.age}</span>
         <span class="lv-text"><b>Level ${lv.age}</b><small>${lv.month}</small></span>
       </div>
@@ -410,14 +590,20 @@
   }
   const soundBtn = () => `<button class="icon-btn" data-act="mute" aria-label="${state.settings.muted ? "Turn sound on" : "Mute sound"}" title="${state.settings.muted ? "Sound off" : "Sound on"}">${icon(state.settings.muted ? "volume-x" : "volume-2")}</button>`;
   let syncBtn = () => `<button class="icon-btn sync-btn" data-act="sync" aria-label="Cloud sync" title="Cloud sync">${icon("cloud")}<span class="sync-dot off"></span></button>`;
+  let refreshBtn = () => `<button class="icon-btn refresh-btn" data-act="refresh-all" aria-label="Sync & refresh app" title="Sync tasks & check for app updates">${icon("refresh-cw")}</button>`;
 
   // ---------------- hall ----------------
   function runItem(m) {
-    const a = areaById(m.areaId), st = moleStatus(m);
+    const a = areaById(m.areaId), st = moleStatus(m), rm = repeatMeta(m.repeat);
+    const metaParts = [
+      `<span class="run-area">${esc(a.name)}</span>`,
+      rm ? `<span class="run-repeat">${rm.target > 1 ? `${m.cycleHits || 0}/${rm.target} this ${rm.period}` : rm.label}</span>` : "",
+      dueText(m) ? `<span class="run-due ${st}">${dueText(m)}</span>` : (!rm ? URG[m.urgency].label : ""),
+    ].filter(Boolean).join(" · ");
     return `<li class="run-item${st === "overdue" ? " is-over" : ""}" style="${themeVars(themeOf(a))}">
       <button class="run-open" data-open="${a.id}" title="Open the ${esc(a.name)} machine">
         <span class="tile sm">${icon(a.icon)}</span>
-        <span class="run-text"><b dir="auto">${esc(m.title)}</b><small><span class="run-area">${esc(a.name)}</span>${dueText(m) ? ` · <span class="run-due ${st}">${dueText(m)}</span>` : ` · ${URG[m.urgency].label}`}</small></span>
+        <span class="run-text"><b dir="auto">${esc(m.title)}</b><small>${metaParts}</small></span>
       </button>
       <button class="whack-btn" data-whack="${m.id}" aria-label="Whack: ${esc(m.title)}" title="Done, whack it">${icon("hammer")}</button>
     </li>`;
@@ -426,11 +612,12 @@
   // ----- arcade floor: a tidy grid of themed machines, Today's run alongside -----
   function renderHall() {
     const calm = lifeCalm(), ci = calmInfo(calm);
-    const loose = state.moles.length;
-    const overdue = state.moles.filter((m) => moleStatus(m) === "overdue").length;
-    const hot = sortMoles(state.moles.filter(isHot));
+    const active = activeMoles();
+    const loose = active.length;
+    const overdue = active.filter((m) => moleStatus(m) === "overdue").length;
+    const hot = sortMoles(active.filter(isHot));
     const weekAhead = addDays(dayKey(), 7);
-    const soon = sortMoles(state.moles.filter((m) => !isHot(m) && m.due && m.due <= weekAhead));
+    const soon = sortMoles(active.filter((m) => !isHot(m) && m.due && m.due <= weekAhead));
     const rest = loose - hot.length - soon.length;
     const doneToday = doneOn(dayKey());
     const dateLong = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
@@ -440,6 +627,7 @@
         <a class="brand" href="#/" aria-label="Whack-a-Life home"><span class="brand-mark">${icon("hammer")}</span><span class="brand-text">Whack-a-Life</span></a>
         ${hudHTML()}
         <nav class="top-actions" aria-label="Options">
+          ${refreshBtn()}
           ${syncBtn()}
           <button class="icon-btn" data-act="stats" aria-label="History" title="History">${icon("calendar")}</button>
           ${soundBtn()}
@@ -483,7 +671,7 @@
           <div class="floor-head">
             <div>
               <h1 id="floor-title">Arcade floor</h1>
-              <p class="sub">${plural(loose, "mole")} loose across ${plural(new Set(state.moles.map((m) => m.areaId)).size, "machine")}${overdue ? ` · <span class="warn">${overdue} overdue</span>` : ""}</p>
+              <p class="sub">${plural(loose, "mole")} loose across ${plural(new Set(active.map((m) => m.areaId)).size, "machine")}${overdue ? ` · <span class="warn">${overdue} overdue</span>` : ""}</p>
             </div>
             <div class="floor-head-actions">
               <div class="calm-card" title="Average calm across all machines">
@@ -529,9 +717,10 @@
       </span>`;
   }
 
-  function plaqueHTML({ ic, name, badge = "", meter = "", note = "", key = "" }) {
+  function plaqueHTML({ ic, name, badge = "", meter = "", note = "", key = "", goalText = "" }) {
     return `<span class="mach-plaque">
         <span class="pl-row"><span class="pl-ic">${icon(ic)}</span><span class="pl-name">${esc(name)}</span>${badge}<span class="pl-go">${icon("chevron-right")}</span></span>
+        ${goalText ? `<span class="pl-goal" title="Machine goal: ${esc(goalText)}">${icon("trophy")}<span dir="auto">${esc(goalText)}</span></span>` : ""}
         <span class="pl-row pl-sub">${meter}<span class="pl-txt">${note}</span>${key !== "" ? `<kbd>${key}</kbd>` : ""}</span>
       </span>`;
   }
@@ -555,6 +744,7 @@
         meter: `<span class="meter"><span style="width:${Math.max(calm, 4)}%;background:${ci.color}"></span></span>`,
         note: preview ? TYPES[type].label : ci.label,
         key: !preview && idx < 9 ? idx + 1 : "",
+        goalText: !preview ? goalSummaryText(a.goal) : "",
       })}`;
     if (preview) return `<div class="mcard preview mach-${type}" style="${themeVars(t)}">${inner}</div>`;
     return `<button class="mcard mach-${type}" data-id="${a.id}" style="${themeVars(t)}"
@@ -594,10 +784,11 @@
 
   function holeHTML(m, t, i) {
     const st = moleStatus(m);
-    const badge = st === "overdue" ? `<span class="badge over">Overdue</span>` : st === "today" ? `<span class="badge today">Today</span>`
+    const dueBadge = st === "overdue" ? `<span class="badge over">Overdue</span>` : st === "today" ? `<span class="badge today">Today</span>`
       : st === "tomorrow" ? `<span class="badge">Tomorrow</span>` : st === "later" ? `<span class="badge">${fmtDate(m.due)}</span>` : "";
+    const topBadge = m.repeat ? comboBadgeHTML(m) : dueBadge;
     return `<div class="hole" style="--i:${i}">
-      <div class="hole-art">${badge}${holeBack}
+      <div class="hole-art">${topBadge}${holeBack}
         <div class="pit"><button class="mole u-${m.urgency}${st === "overdue" ? " overdue" : ""}${m.id === justAdded ? " pop" : ""}" data-whack="${m.id}"
           aria-label="Whack: ${esc(m.title)} (${URG[m.urgency].label}${dueText(m) ? ", " + dueText(m) : ""})">${moleSVG(t.id, moodOf(m))}</button></div>
         ${holeFront}
@@ -614,13 +805,14 @@
       <a class="btn btn-white back" href="#/" aria-label="Back to the arcade floor">${icon("arrow-left")}<span>Arcade</span></a>
       <div class="plate"><span class="tile">${icon(iconName)}</span><div><h1>${esc(title)}</h1><p>${esc(sub)}</p></div></div>
       ${hudHTML()}
-      <nav class="top-actions" aria-label="Options">${syncBtn()}${soundBtn()}${extra}</nav>
+      <nav class="top-actions" aria-label="Options">${refreshBtn()}${syncBtn()}${soundBtn()}${extra}</nav>
     </header>`;
   }
 
   function renderGame(a, { intro }) {
     const t = themeOf(a);
     const moles = molesOf(a.id);
+    const resting = restingMolesOf(a.id);
     const calm = areaCalm(a.id), ci = calmInfo(calm);
     const today = dayKey();
     const todayCount = state.history.filter((h) => h.areaId === a.id && dayKey(h.whackedAt) === today).length;
@@ -628,10 +820,13 @@
     const cols = narrowMQ.matches ? 3 : 4;
     const holes = Math.max(cols * 2, Math.ceil((moles.length + 1) / cols) * cols);
     const draft = $("#qa-title")?.value || "";
+    const headerBtns = `
+      <button class="icon-btn" data-act="goal-edit" aria-label="${a.goal ? "Edit machine goal" : "Set machine goal"}" title="${a.goal ? "Edit machine goal" : "Set a machine goal"}">${icon("trophy")}</button>
+      <button class="icon-btn" data-act="machine-settings" aria-label="Machine settings" title="Machine settings">${icon("settings-2")}</button>`;
 
     app.innerHTML = `
       <div class="game" style="${themeVars(t)}">
-        ${gameHeader(t, a.name, t.name, a.icon, `<button class="icon-btn" data-act="machine-settings" aria-label="Machine settings" title="Machine settings">${icon("settings-2")}</button>`)}
+        ${gameHeader(t, a.name, t.name, a.icon, headerBtns)}
         <section class="stage${intro ? " intro" : ""}" aria-label="${esc(a.name)} whack-a-mole board">
           <div class="stage-sky">${sceneSVG(t.id)}</div>
           <div class="stage-hud">
@@ -639,6 +834,7 @@
             <div class="chip-card"><small>Loose</small><b>${moles.length}</b></div>
             <div class="chip-card"><small>Whacked today</small><b>${todayCount}</b></div>
           </div>
+          ${goalBannerHTML(a)}
           <div class="field">
             <div class="holes">${Array.from({ length: holes }, (_, i) => (moles[i] ? holeHTML(moles[i], t, i) : emptyHoleHTML(i))).join("")}</div>
           </div>
@@ -647,6 +843,17 @@
         <form class="quick-add" id="quick-add" autocomplete="off">
           <label class="sr-only" for="qa-title">New mole for ${esc(a.name)}</label>
           <input id="qa-title" name="title" class="qa-input" placeholder="What popped up in ${esc(a.name)}?" maxlength="140" required value="${esc(draft)}" />
+          <label class="sr-only" for="qa-repeat">Repeat cadence</label>
+          <select id="qa-repeat" name="qaRepeat" class="qa-repeat" title="One-time or recurring">
+            <option value="none">One-time</option>
+            <option value="day:1">↻ Daily</option>
+            <option value="week:1">↻ Weekly (1×)</option>
+            <option value="week:2">↻ 2× / week</option>
+            <option value="week:3">↻ 3× / week</option>
+            <option value="week:4">↻ 4× / week</option>
+            <option value="week:5">↻ 5× / week</option>
+            <option value="month:1">↻ Monthly</option>
+          </select>
           <label class="sr-only" for="qa-due">Due date (optional)</label>
           <input type="date" id="qa-due" name="due" class="input qa-date" title="Due date (optional)" />
           <div class="seg" role="radiogroup" aria-label="Urgency">${urgencySeg("qa-urgency")}</div>
@@ -661,9 +868,21 @@
               <li class="q-row">
                 <span class="dot u-${m.urgency}" title="${URG[m.urgency].label}"></span>
                 <button class="q-title" data-edit="${m.id}" title="Edit" dir="auto">${esc(m.title)}</button>
+                ${comboChipHTML(m)}
                 ${dueChip(m)}
                 <button class="whack-btn" data-whack="${m.id}" aria-label="Whack: ${esc(m.title)}" title="Done, whack it">${icon("hammer")}</button>
               </li>`).join("")}</ul>` : `<p class="empty-msg">${icon("sparkles")}All clear on this machine.</p>`}
+            ${resting.length ? `
+              <div class="resting-sec">
+                <h3 class="resting-head">${icon("check")}Cleared for this cycle</h3>
+                <ul class="resting-list">${resting.map((m) => {
+                  const rm = repeatMeta(m.repeat);
+                  return `<li class="resting-row">
+                    <button class="q-title" data-edit="${m.id}" title="Edit recurring mole" dir="auto">${esc(m.title)}</button>
+                    <span class="resting-note">✓ ${rm ? `${rm.target}/${rm.target} · back ${rm.resetLabel}` : "Done"}</span>
+                  </li>`;
+                }).join("")}</ul>
+              </div>` : ""}
           </div>
           <div class="panel">
             <div class="panel-head"><h2>Recently whacked</h2></div>
@@ -679,6 +898,7 @@
   function whack(id, evt) {
     const m = state.moles.find((x) => x.id === id);
     if (!m) return;
+    syncMoleCycle(m);
     const t = themeOf(areaById(m.areaId));
     const trigger = evt.target.closest("[data-whack]");
     const moleEl = $(`.mole[data-whack="${CSS.escape(id)}"]`);
@@ -688,17 +908,45 @@
     if (target !== trigger || !evt.detail) { const r = target.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 3; }
 
     swing(x, y); playWhack();
+
+    const now = Date.now();
+    if (m.repeat && m.repeat.period && m.repeat.period !== "none") {
+      const targetHits = Math.max(1, Number(m.repeat.target) || 1);
+      m.cycleHits = (m.cycleHits || 0) + 1;
+      m.updatedAt = now;
+      const clearedCycle = m.cycleHits >= targetHits;
+      const entryTitle = targetHits > 1 ? `${m.title} (${m.cycleHits}/${targetHits})` : m.title;
+      const entry = { id: uid(), moleId: m.id, comboHit: true, areaId: m.areaId, title: entryTitle, urgency: m.urgency, due: m.due, whackedAt: now };
+      state.history.unshift(entry);
+
+      if (moleEl) {
+        moleEl.classList.remove("combo-hit"); void moleEl.offsetWidth;
+        moleEl.classList.add(clearedCycle ? "whacked" : "combo-hit");
+        shakeStage();
+      }
+      if (clearedCycle) trigger.closest(".run-item, .q-row")?.classList.add("leaving");
+      burst(x, y, t, clearedCycle ? (targetHits > 1 ? `${m.cycleHits}/${targetHits} CLEAR!` : "CLEAR!") : `${m.cycleHits}/${targetHits}!`);
+
+      save();
+      if (clearedCycle && !molesOf(m.areaId).length && route.view === "game") {
+        setTimeout(() => banner("All clear!", areaById(m.areaId)?.name || ""), 350);
+      }
+      setTimeout(render, moleEl ? 440 : 280);
+      showUndo(m, entry, { isCombo: true });
+      return;
+    }
+
     if (moleEl) { moleEl.classList.add("whacked"); shakeStage(); }
     trigger.closest(".run-item, .q-row")?.classList.add("leaving");
     burst(x, y, t);
 
-    const entry = { id: uid(), moleId: m.id, areaId: m.areaId, title: m.title, urgency: m.urgency, due: m.due, whackedAt: Date.now() };
+    const entry = { id: uid(), moleId: m.id, areaId: m.areaId, title: m.title, urgency: m.urgency, due: m.due, whackedAt: now };
     state.moles = state.moles.filter((x2) => x2.id !== id);
     state.history.unshift(entry);
     save();
-    if (!state.moles.some((x2) => x2.areaId === m.areaId) && route.view === "game") setTimeout(() => banner("All clear!", areaById(m.areaId)?.name || ""), 350);
+    if (!molesOf(m.areaId).length && route.view === "game") setTimeout(() => banner("All clear!", areaById(m.areaId)?.name || ""), 350);
     setTimeout(render, moleEl ? 480 : 300);
-    showUndo(m, entry);
+    showUndo(m, entry, { isCombo: false });
   }
 
   function shakeStage() {
@@ -733,16 +981,24 @@
     }
   }
 
-  function showUndo(mole, entry) {
+  function showUndo(mole, entry, { isCombo = false } = {}) {
     const toast = $("#toast");
-    toast.innerHTML = `<span class="toast-ic">${icon("hammer")}</span><span class="toast-msg">Whacked <b>${esc(mole.title)}</b></span><button class="btn btn-white sm">${icon("undo-2")}Undo</button>`;
+    toast.innerHTML = `<span class="toast-ic">${icon("hammer")}</span><span class="toast-msg">Whacked <b>${esc(entry.title)}</b></span><button class="btn btn-white sm">${icon("undo-2")}Undo</button>`;
     toast.hidden = false;
     $("button", toast).onclick = () => {
       state.history = state.history.filter((h) => h.id !== entry.id);
       state.deletedIds[entry.id] = Date.now();
-      mole.updatedAt = Date.now();
-      if (areaById(mole.areaId)) state.moles.push(mole);
-      justAdded = mole.id;
+      if (isCombo) {
+        const live = state.moles.find((x) => x.id === mole.id);
+        if (live) {
+          live.cycleHits = Math.max(0, (live.cycleHits || 1) - 1);
+          live.updatedAt = Date.now();
+        }
+      } else {
+        mole.updatedAt = Date.now();
+        if (areaById(mole.areaId)) state.moles.push(mole);
+        justAdded = mole.id;
+      }
       save(); render(); toast.hidden = true;
     };
     clearTimeout(undoTimer);
@@ -944,6 +1200,7 @@
     if (el.hasAttribute("data-add-here")) return $("#qa-title")?.focus();
     if (el.dataset.id) return enter(el.dataset.id);
     switch (el.dataset.act) {
+      case "refresh-all": return refreshAll();
       case "sync": return openSyncDialog();
       case "tab-floor": hallTab = "floor"; renderHall(); return;
       case "tab-today": hallTab = "today"; renderHall(); return;
@@ -955,6 +1212,9 @@
       case "new-mole": return openMoleDialog();
       case "bulk": return openBulk();
       case "machine-settings": return openMachineDialog(areaById(route.id));
+      case "goal-edit": return openGoalDialog(areaById(route.id));
+      case "goal-minus": return stepGoal(areaById(route.id), -1);
+      case "goal-plus": return stepGoal(areaById(route.id), 1);
       case "play": return enterPlay();
       case "play-start": playCoin(); return startPlay();
     }
@@ -971,7 +1231,22 @@
     const title = f.title.value.trim();
     if (!title) return;
     const now = Date.now();
-    const m = { id: uid(), createdAt: now, updatedAt: now, areaId: route.id, title, due: f.due.value || null, urgency: f["qa-urgency"].value || "medium" };
+    const qaRep = f.qaRepeat?.value || "none";
+    let repeat = null;
+    if (qaRep !== "none" && qaRep.includes(":")) {
+      const [period, tgt] = qaRep.split(":");
+      repeat = { period, target: Math.max(1, Number(tgt) || 1) };
+    }
+    const m = {
+      id: uid(),
+      createdAt: now,
+      updatedAt: now,
+      areaId: route.id,
+      title,
+      due: f.due.value || null,
+      urgency: f["qa-urgency"].value || "medium",
+      ...(repeat ? { repeat, cycleKey: periodKey(repeat.period), cycleHits: 0 } : {}),
+    };
     state.moles.push(m);
     justAdded = m.id;
     f.title.value = "";
@@ -1205,6 +1480,29 @@
   const moleDialog = $("#mole-dialog"), moleForm = $("#mole-form");
   let editingMole = null;
   $("[data-urgency-seg]").innerHTML = urgencySeg("urgency");
+  $("[data-repeat-seg]").innerHTML = REPEAT_OPTS.map((o) =>
+    `<label class="seg-opt"><input type="radio" name="repeatPeriod" value="${o.id}"${o.id === "none" ? " checked" : ""} /><span>${o.id !== "none" ? icon("repeat") : ""}${o.label}</span></label>`
+  ).join("");
+
+  function updateMoleRepeatUI() {
+    const period = moleForm.elements.repeatPeriod?.value || "none";
+    const wrap = $("#mole-repeat-target-wrap");
+    const unitEl = $("#mole-repeat-unit");
+    if (!wrap || !unitEl) return;
+    const opt = REPEAT_OPTS.find((o) => o.id === period);
+    wrap.hidden = period === "none";
+    if (opt?.unit) unitEl.textContent = opt.unit;
+  }
+  moleForm.addEventListener("change", (e) => {
+    if (e.target.name === "repeatPeriod") {
+      const period = e.target.value;
+      if (period !== "none" && !editingMole) {
+        const a = areaById(moleForm.elements.areaId.value);
+        moleForm.elements.repeatTarget.value = norm(a?.name || "") === "fitness" && period === "week" ? 3 : 1;
+      }
+      updateMoleRepeatUI();
+    }
+  });
 
   function openMoleDialog(m) {
     if (!state.areas.length) return openMachineDialog();
@@ -1215,6 +1513,10 @@
     f.title.value = m?.title || "";
     f.due.value = m?.due || "";
     f.urgency.value = m?.urgency || "medium";
+    const repPeriod = m?.repeat?.period || "none";
+    if (f.repeatPeriod) f.repeatPeriod.value = repPeriod;
+    if (f.repeatTarget) f.repeatTarget.value = m?.repeat?.target || (norm(areaById(f.areaId.value)?.name || "") === "fitness" ? 3 : 1);
+    updateMoleRepeatUI();
     $("#mole-dialog-title").textContent = editingMole ? "Edit mole" : "New mole";
     $("#mole-save").innerHTML = editingMole ? "Save" : `${icon("plus")}Pop it`;
     $("#mole-delete").hidden = !editingMole;
@@ -1225,11 +1527,43 @@
     e.preventDefault();
     const f = moleForm.elements;
     const now = Date.now();
-    const data = { title: f.title.value.trim(), areaId: f.areaId.value, due: f.due.value || null, urgency: f.urgency.value || "medium", updatedAt: now };
+    const period = f.repeatPeriod?.value || "none";
+    const target = Math.max(1, Math.min(14, Number(f.repeatTarget?.value) || 1));
+    const data = {
+      title: f.title.value.trim(),
+      areaId: f.areaId.value,
+      due: f.due.value || null,
+      urgency: f.urgency.value || "medium",
+      updatedAt: now,
+    };
     if (!data.title) return;
     lastAreaId = data.areaId;
-    if (editingMole) Object.assign(state.moles.find((m) => m.id === editingMole), data);
-    else { const m = { id: uid(), createdAt: now, ...data }; state.moles.push(m); justAdded = m.id; playPop(); }
+    if (editingMole) {
+      const existing = state.moles.find((m) => m.id === editingMole);
+      if (existing) {
+        Object.assign(existing, data);
+        if (period === "none") {
+          delete existing.repeat;
+          delete existing.cycleKey;
+          delete existing.cycleHits;
+        } else {
+          const samePeriod = existing.repeat?.period === period;
+          existing.repeat = { period, target };
+          existing.cycleKey = periodKey(period);
+          existing.cycleHits = samePeriod ? Math.min(target, existing.cycleHits || 0) : 0;
+        }
+      }
+    } else {
+      const m = {
+        id: uid(),
+        createdAt: now,
+        ...data,
+        ...(period !== "none" ? { repeat: { period, target }, cycleKey: periodKey(period), cycleHits: 0 } : {}),
+      };
+      state.moles.push(m);
+      justAdded = m.id;
+      playPop();
+    }
     moleDialog.close();
     save(); render();
   });
@@ -1240,6 +1574,74 @@
     if (!(await confirmBox({ title: "Delete this mole?", body: `"${m.title}" will be removed from your list without counting as done.` }))) return;
     state.deletedIds[m.id] = Date.now();
     state.moles = state.moles.filter((x) => x.id !== m.id);
+    save(); render();
+  });
+
+  // machine goal dialog
+  const goalDialog = $("#goal-dialog"), goalForm = $("#goal-form");
+  let editingGoalAreaId = null;
+  function openGoalDialog(area) {
+    if (!area) return;
+    editingGoalAreaId = area.id;
+    const g = area.goal || null;
+    const f = goalForm.elements;
+    f.title.value = g?.title || "";
+    f.current.value = g?.current ?? 0;
+    f.target.value = g?.target ?? "";
+    f.unit.value = g?.unit || "";
+    $("#goal-dialog-title").textContent = `${area.name} goal`;
+    $("#goal-delete").hidden = !g;
+    goalDialog.showModal();
+    f.title.focus();
+  }
+  function stepGoal(area, dir) {
+    if (!area?.goal) return;
+    const g = area.goal;
+    const tgt = Number(g.target) || 0;
+    const step = g.step || (tgt > 0 && tgt <= 10 ? 0.5 : tgt >= 500 ? 100 : 1);
+    const next = Math.max(0, Math.round(((Number(g.current) || 0) + dir * step) * 100) / 100);
+    g.current = next;
+    const now = Date.now();
+    g.updatedAt = now;
+    area.goalUpdatedAt = now;
+    area.updatedAt = now;
+    playBlip(dir > 0 && tgt > 0 && next >= tgt);
+    if (dir > 0 && tgt > 0 && next >= tgt) banner("Goal reached!", `${area.name}: ${g.title}`);
+    save(); render();
+  }
+  goalForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const area = areaById(editingGoalAreaId);
+    if (!area) return;
+    const f = goalForm.elements;
+    const title = f.title.value.trim();
+    if (!title) return;
+    const current = Math.max(0, Number(f.current.value) || 0);
+    const targetRaw = f.target.value.trim();
+    const target = targetRaw ? Math.max(0, Number(targetRaw) || 0) : 0;
+    const unit = f.unit.value.trim();
+    const now = Date.now();
+    area.goal = {
+      title,
+      current,
+      target,
+      unit,
+      step: target > 0 && target <= 10 ? 0.5 : target >= 500 ? 100 : 1,
+      updatedAt: now,
+    };
+    area.goalUpdatedAt = now;
+    area.updatedAt = now;
+    goalDialog.close();
+    save(); playPop(); render();
+  });
+  $("#goal-delete").addEventListener("click", () => {
+    const area = areaById(editingGoalAreaId);
+    if (!area) return;
+    const now = Date.now();
+    delete area.goal;
+    area.goalUpdatedAt = now;
+    area.updatedAt = now;
+    goalDialog.close();
     save(); render();
   });
 
@@ -1377,9 +1779,53 @@
     const m = syncMeta();
     return `<button class="icon-btn sync-btn" data-act="sync" aria-label="Cloud sync: ${esc(m.label)}" title="Cloud sync: ${esc(m.label)}">${icon("cloud")}<span class="sync-dot ${m.cls}"></span></button>`;
   };
+  refreshBtn = () => `<button class="icon-btn refresh-btn${syncBusy ? " spinning" : ""}" data-act="refresh-all" aria-label="Sync & refresh app" title="Sync tasks & check for app updates">${icon("refresh-cw")}</button>`;
   function updateSyncUI() {
     for (const b of $$('[data-act="sync"]')) b.outerHTML = syncBtn();
+    for (const b of $$('[data-act="refresh-all"]')) b.outerHTML = refreshBtn();
     if ($("#sync-dialog")?.open) renderSyncDialogStatus();
+  }
+
+  let updateCheckBusy = false;
+  async function checkForAppUpdate({ manual = false } = {}) {
+    if (updateCheckBusy || location.protocol === "file:") return false;
+    updateCheckBusy = true;
+    try {
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) await reg.update().catch(() => {});
+      }
+      const res = await fetch(`./version.json?_=${Date.now()}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.build && data.build !== APP_BUILD) {
+          notify("New app update found — refreshing…");
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((k) => caches.delete(k)));
+          }
+          setTimeout(() => location.reload(), 300);
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      updateCheckBusy = false;
+    }
+  }
+
+  async function refreshAll() {
+    for (const b of $$('[data-act="refresh-all"]')) b.classList.add("spinning");
+    const updated = await checkForAppUpdate({ manual: true });
+    if (updated) return;
+    if (syncCfg.token || syncCfg.gistId) {
+      await syncWithGist({ forcePush: syncCfg.dirty, notifyUser: true });
+    } else {
+      notify("App is up to date.");
+    }
+    for (const b of $$('[data-act="refresh-all"]')) b.classList.remove("spinning");
   }
 
   async function ghFetch(path, token, opts = {}) {
@@ -1455,10 +1901,10 @@
       syncBusy = false;
       updateSyncUI();
       if (beforeJSON !== afterJSON && route.view !== "play") {
-        const busyEditing = $("#mole-dialog")?.open || $("#bulk-dialog")?.open || $("#machine-dialog")?.open || document.activeElement?.id === "qa-title";
+        const busyEditing = $("#mole-dialog")?.open || $("#bulk-dialog")?.open || $("#machine-dialog")?.open || $("#goal-dialog")?.open || document.activeElement?.id === "qa-title";
         if (!busyEditing) render();
       }
-      if (notifyUser) notify(`Synced <b>${state.moles.length}</b> loose moles with your Secret Gist.`);
+      if (notifyUser) notify(`Synced <b>${activeMoles().length}</b> loose moles with your Secret Gist.`);
       return true;
     } catch (err) {
       syncBusy = false;
@@ -1684,17 +2130,37 @@
   // boot
   const seeded = applySeeds();
   let lastDay = dayKey();
-  setInterval(() => { if (dayKey() !== lastDay && route.view !== "play") { lastDay = dayKey(); render(); } }, 60_000);
+  setInterval(() => {
+    if (dayKey() !== lastDay && route.view !== "play") {
+      lastDay = dayKey();
+      state.moles.forEach((m) => syncMoleCycle(m));
+      save({ fromSync: true });
+      render();
+    }
+    checkForAppUpdate();
+  }, 60_000);
   window.addEventListener("storage", (e) => { if (e.key === STORAGE_KEY && route.view !== "play") { state = load(); render(); } });
   window.addEventListener("resize", () => { if (route.view === "hall") fitMachines(app); });
   narrowMQ.addEventListener("change", () => { if (route.view === "game" || (route.view === "play" && !play)) render(); });
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (syncCfg.token || syncCfg.gistId)) syncWithGist(); });
-  window.addEventListener("focus", () => { if ((syncCfg.token || syncCfg.gistId) && Date.now() - (syncCfg.lastSyncAt || 0) > 15_000) syncWithGist(); });
-  window.addEventListener("online", () => { if (syncCfg.token || syncCfg.gistId) syncWithGist({ forcePush: syncCfg.dirty }); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      checkForAppUpdate();
+      if (syncCfg.token || syncCfg.gistId) syncWithGist();
+    }
+  });
+  window.addEventListener("focus", () => {
+    checkForAppUpdate();
+    if ((syncCfg.token || syncCfg.gistId) && Date.now() - (syncCfg.lastSyncAt || 0) > 15_000) syncWithGist();
+  });
+  window.addEventListener("online", () => {
+    checkForAppUpdate();
+    if (syncCfg.token || syncCfg.gistId) syncWithGist({ forcePush: syncCfg.dirty });
+  });
 
   hydrateIcons();
   save({ fromSync: !(seeded.added || seeded.done || seeded.renamed) });
   renderView({ intro: true });
+  checkForAppUpdate();
   if (syncCfg.token || syncCfg.gistId) syncWithGist({ forcePush: syncCfg.dirty });
   const seedMsg = [
     seeded.added && `added <b>${seeded.added}</b> new ${seeded.added === 1 ? "mole" : "moles"}`,
@@ -1710,6 +2176,12 @@
   }
 
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+    let swRefreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (swRefreshing) return;
+      swRefreshing = true;
+      location.reload();
+    });
+    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").then((reg) => reg.update()).catch(() => {}));
   }
 })();
