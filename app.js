@@ -9,6 +9,7 @@
   const STORAGE_KEY = "whack-a-life-v1";
   const SYNC_KEY = "whack-a-life-sync-v1";
   const GIST_FILENAME = "whack-a-life-sync.json";
+  const DEFAULT_GIST_ID = "05466cbaca8486f92f45f3909f9be49e";
   const BIRTH_DATE = "1998-10-03";
   const DEFAULT_AREAS = ["Work", "MBA", "Apartment", "Money", "Travel", "Health", "Family", "Possessions", "Murphy"];
   const URG = {
@@ -138,6 +139,7 @@
     }
     const histMap = new Map();
     const whackedMoleIds = new Set();
+    const whackedTitleTime = new Map();
     for (const h of [...R.history, ...L.history]) {
       if (deletedIds[h.id]) continue;
       const entry = { ...h, areaId: remapId(h.areaId), moleId: h.moleId || h.id };
@@ -147,18 +149,28 @@
       if (!prev || entry.whackedAt < prev.whackedAt) histMap.set(key, entry);
       whackedMoleIds.add(entry.moleId);
       whackedMoleIds.add(entry.id);
+      const tKey = `${entry.areaId}::${norm(entry.title)}`;
+      whackedTitleTime.set(tKey, Math.max(whackedTitleTime.get(tKey) || 0, entry.whackedAt || 0));
     }
     const history = [...histMap.values()].sort((a, b) => b.whackedAt - a.whackedAt);
 
-    // Merge open moles
+    // Merge open moles (deduplicating by id and by areaId + normalized title)
     const moleMap = new Map();
+    const titleKeyMap = new Map();
     for (const m of [...R.moles, ...L.moles]) {
       const item = { ...m, areaId: remapId(m.areaId), updatedAt: m.updatedAt || m.createdAt || 0 };
       if (!validAreaIds.has(item.areaId)) continue;
       if (whackedMoleIds.has(item.id)) continue;
+      const tKey = `${item.areaId}::${norm(item.title)}`;
+      if ((whackedTitleTime.get(tKey) || 0) >= item.updatedAt && item.updatedAt > 0) continue;
       if (deletedIds[item.id] && deletedIds[item.id] > item.updatedAt) continue;
-      const prev = moleMap.get(item.id);
-      if (!prev || item.updatedAt >= prev.updatedAt) moleMap.set(item.id, item);
+      const existingIdForTitle = titleKeyMap.get(tKey);
+      const canonicalId = existingIdForTitle || item.id;
+      const prev = moleMap.get(canonicalId);
+      if (!prev || item.updatedAt >= prev.updatedAt) {
+        moleMap.set(canonicalId, { ...item, id: canonicalId });
+        titleKeyMap.set(tKey, canonicalId);
+      }
     }
     const moles = [...moleMap.values()];
 
@@ -298,6 +310,16 @@
   const screenFor = (r) => r.view === "play" ? $(".mach-play .cab-screen") : r.view === "game" ? $(`.mcard[data-id="${CSS.escape(r.id)}"] .cab-screen`) : null;
 
   window.addEventListener("hashchange", () => {
+    if (location.hash.startsWith("#sync=")) {
+      const unpacked = decodeSetupCode(decodeURIComponent(location.hash.slice(6)));
+      if (unpacked?.token) {
+        syncCfg = { token: unpacked.token, gistId: unpacked.gistId || DEFAULT_GIST_ID, lastSyncAt: 0, dirty: false };
+        saveSyncCfg();
+        history.replaceState(null, "", "#/");
+        syncWithGist({ forcePush: true, notifyUser: true });
+        return;
+      }
+    }
     const prev = route, next = parseHash();
     if (next.view === "game" && !areaById(next.id)) { location.hash = "#/"; return; }
     route = next;
@@ -1269,27 +1291,29 @@
       if (typeof location !== "undefined" && typeof location.hash === "string" && location.hash.startsWith("#sync=")) {
         const unpacked = decodeSetupCode(decodeURIComponent(location.hash.slice(6)));
         if (unpacked?.token) {
-          const cfg = { token: unpacked.token, gistId: unpacked.gistId || "", lastSyncAt: 0, dirty: false };
+          const cfg = { token: unpacked.token, gistId: unpacked.gistId || DEFAULT_GIST_ID, lastSyncAt: 0, dirty: false };
           localStorage.setItem(SYNC_KEY, JSON.stringify(cfg));
           history.replaceState(null, "", "#/");
-          route = { view: "hall" };
           return cfg;
         }
       }
       const c = JSON.parse(localStorage.getItem(SYNC_KEY));
       if (c && typeof c === "object" && c.token) {
-        return { token: c.token || "", gistId: c.gistId || "", lastSyncAt: c.lastSyncAt || 0, dirty: !!c.dirty };
+        return { token: c.token || "", gistId: c.gistId || DEFAULT_GIST_ID, lastSyncAt: c.lastSyncAt || 0, dirty: !!c.dirty };
       }
       if (window.WAL_DEFAULT_SYNC && window.WAL_DEFAULT_SYNC.token) {
-        const cfg = { token: String(window.WAL_DEFAULT_SYNC.token).trim(), gistId: String(window.WAL_DEFAULT_SYNC.gistId || "").trim(), lastSyncAt: 0, dirty: false };
+        const cfg = { token: String(window.WAL_DEFAULT_SYNC.token).trim(), gistId: String(window.WAL_DEFAULT_SYNC.gistId || DEFAULT_GIST_ID).trim(), lastSyncAt: 0, dirty: false };
         localStorage.setItem(SYNC_KEY, JSON.stringify(cfg));
         return cfg;
       }
+      if (c && typeof c === "object" && c.gistId) {
+        return { token: "", gistId: c.gistId, lastSyncAt: c.lastSyncAt || 0, dirty: false };
+      }
     } catch {}
-    return { token: "", gistId: "", lastSyncAt: 0, dirty: false };
+    return { token: "", gistId: DEFAULT_GIST_ID, lastSyncAt: 0, dirty: false };
   }
   let syncCfg = loadSyncCfg();
-  let syncState = syncCfg.token ? (syncCfg.dirty ? "dirty" : "ok") : "off";
+  let syncState = syncCfg.token ? (syncCfg.dirty ? "dirty" : "ok") : (syncCfg.lastSyncAt ? "ok" : "off");
   let syncError = "";
   let syncBusy = false;
   let syncTimer = null;
@@ -1297,10 +1321,16 @@
   const saveSyncCfg = () => localStorage.setItem(SYNC_KEY, JSON.stringify(syncCfg));
 
   function syncMeta() {
-    if (!syncCfg.token) return { cls: "off", label: "Not connected", sub: "Paste a GitHub token with the gist scope to sync across your iPhone and Mac." };
-    if (syncBusy) return { cls: "busy", label: "Syncing…", sub: "Updating your Secret GitHub Gist." };
+    if (syncBusy) return { cls: "busy", label: "Syncing…", sub: "Updating from your Secret GitHub Gist." };
     if (syncState === "error") return { cls: "err", label: "Offline or sync error", sub: syncError || "Changes are saved on this device and will sync when back online." };
     const ago = syncCfg.lastSyncAt ? `Last synced ${new Date(syncCfg.lastSyncAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Ready to sync";
+    if (!syncCfg.token) {
+      return {
+        cls: syncCfg.lastSyncAt ? "dirty" : "off",
+        label: syncCfg.lastSyncAt ? "Loaded from Cloud (read-only)" : "Connect for two-way sync",
+        sub: "Paste your setup code below so changes made on this device also save back to the cloud.",
+      };
+    }
     if (syncCfg.dirty) return { cls: "dirty", label: "Changes pending", sub: `${ago} · Waiting to push…` };
     return { cls: "ok", label: "Synced with Secret Gist", sub: `${ago}${syncCfg.gistId ? ` · Gist ${syncCfg.gistId.slice(0, 8)}…` : ""}` };
   }
@@ -1315,15 +1345,16 @@
   }
 
   async function ghFetch(path, token, opts = {}) {
+    const headers = {
+      Accept: "application/vnd.github+json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.body ? { "Content-Type": "application/json" } : {}),
+      ...(opts.headers || {}),
+    };
     const res = await fetch(`https://api.github.com${path}`, {
       ...opts,
       cache: "no-store",
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        ...(opts.body ? { "Content-Type": "application/json" } : {}),
-        ...(opts.headers || {}),
-      },
+      headers,
     });
     if (!res.ok) {
       let msg = `GitHub API ${res.status}`;
@@ -1349,16 +1380,16 @@
   }
 
   async function syncWithGist({ forcePush = false, notifyUser = false } = {}) {
-    if (!syncCfg.token || syncBusy) return false;
+    if ((!syncCfg.token && !syncCfg.gistId) || syncBusy) return false;
     syncBusy = true;
     syncError = "";
     updateSyncUI();
     try {
-      if (!syncCfg.gistId) {
+      if (!syncCfg.gistId && syncCfg.token) {
         syncCfg.gistId = await findOrCreateGist(syncCfg.token);
         saveSyncCfg();
       }
-      const gist = await ghFetch(`/gists/${encodeURIComponent(syncCfg.gistId)}`, syncCfg.token);
+      const gist = await ghFetch(`/gists/${encodeURIComponent(syncCfg.gistId)}?_=${Date.now()}`, syncCfg.token);
       const file = gist?.files?.[GIST_FILENAME];
       let remoteState = null;
       if (file?.content) {
@@ -1371,7 +1402,7 @@
       }
       const afterJSON = JSON.stringify({ areas: state.areas, moles: state.moles, history: state.history });
       const remoteJSON = remoteState ? JSON.stringify({ areas: remoteState.areas, moles: remoteState.moles, history: remoteState.history }) : "";
-      if (forcePush || syncCfg.dirty || !remoteState || afterJSON !== remoteJSON) {
+      if (syncCfg.token && (forcePush || syncCfg.dirty || !remoteState || afterJSON !== remoteJSON)) {
         await ghFetch(`/gists/${encodeURIComponent(syncCfg.gistId)}`, syncCfg.token, {
           method: "PATCH",
           body: JSON.stringify({
@@ -1380,14 +1411,14 @@
         });
       }
       syncCfg.lastSyncAt = Date.now();
-      syncCfg.dirty = false;
+      if (syncCfg.token) syncCfg.dirty = false;
       saveSyncCfg();
       syncState = "ok";
       syncBusy = false;
       updateSyncUI();
       if (beforeJSON !== afterJSON && route.view !== "play") {
-        const activeTag = document.activeElement?.tagName;
-        if (!/^(INPUT|TEXTAREA|SELECT)$/.test(activeTag)) render();
+        const busyEditing = $("#mole-dialog")?.open || $("#bulk-dialog")?.open || $("#machine-dialog")?.open || document.activeElement?.id === "qa-title";
+        if (!busyEditing) render();
       }
       if (notifyUser) notify(`Synced <b>${state.moles.length}</b> loose moles with your Secret Gist.`);
       return true;
@@ -1448,7 +1479,7 @@
     const rawToken = syncForm.elements.token.value.trim();
     const decoded = decodeSetupCode(rawToken);
     const token = decoded ? decoded.token : rawToken;
-    const gistId = decoded ? decoded.gistId : syncForm.elements.gistId.value.trim();
+    const gistId = (decoded ? decoded.gistId : syncForm.elements.gistId.value.trim()) || DEFAULT_GIST_ID;
     if (!token) return;
     syncCfg.token = token;
     syncCfg.gistId = gistId;
@@ -1458,6 +1489,8 @@
     if (ok) {
       syncForm.elements.gistId.value = syncCfg.gistId;
       renderSyncDialogStatus();
+      render();
+      setTimeout(() => { if (syncDialog.open) syncDialog.close(); }, 350);
     }
   });
 
@@ -1617,14 +1650,14 @@
   window.addEventListener("storage", (e) => { if (e.key === STORAGE_KEY && route.view !== "play") { state = load(); render(); } });
   window.addEventListener("resize", () => { if (route.view === "hall") fitMachines(app); });
   narrowMQ.addEventListener("change", () => { if (route.view === "game" || (route.view === "play" && !play)) render(); });
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && syncCfg.token) syncWithGist(); });
-  window.addEventListener("focus", () => { if (syncCfg.token && Date.now() - (syncCfg.lastSyncAt || 0) > 15_000) syncWithGist(); });
-  window.addEventListener("online", () => { if (syncCfg.token) syncWithGist({ forcePush: syncCfg.dirty }); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (syncCfg.token || syncCfg.gistId)) syncWithGist(); });
+  window.addEventListener("focus", () => { if ((syncCfg.token || syncCfg.gistId) && Date.now() - (syncCfg.lastSyncAt || 0) > 15_000) syncWithGist(); });
+  window.addEventListener("online", () => { if (syncCfg.token || syncCfg.gistId) syncWithGist({ forcePush: syncCfg.dirty }); });
 
   hydrateIcons();
   save({ fromSync: !(seeded.added || seeded.done || seeded.renamed) });
   renderView({ intro: true });
-  if (syncCfg.token) syncWithGist({ forcePush: syncCfg.dirty });
+  if (syncCfg.token || syncCfg.gistId) syncWithGist({ forcePush: syncCfg.dirty });
   const seedMsg = [
     seeded.added && `added <b>${seeded.added}</b> new ${seeded.added === 1 ? "mole" : "moles"}`,
     seeded.done && `logged <b>${seeded.done}</b> finished ${seeded.done === 1 ? "task" : "tasks"}`,

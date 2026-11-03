@@ -1,5 +1,5 @@
 /* Whack-a-Life Service Worker — offline support & auto-update */
-const CACHE_NAME = "whack-a-life-shell-v2";
+const CACHE_NAME = "whack-a-life-shell-v3";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
