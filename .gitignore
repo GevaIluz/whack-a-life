@@ -1,0 +1,8 @@
+# Personal notes, local backups & version snapshots (keep out of public GitHub Pages repo)
+HANDOFF.md
+START_HERE_AGENT.md
+versions/
+seeds.local.js
+whack-a-life-backup-*.json
+*.backup.json
+.DS_Store

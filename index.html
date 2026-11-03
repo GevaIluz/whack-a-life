@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#BFE3FF" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Whack-a-Life" />
+  <title>Whack-a-Life</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <svg viewBox="0 0 1440 260" preserveAspectRatio="xMidYMin slice">
+      <g fill="#fff">
+        <g transform="translate(90 70)"><circle r="26"/><circle cx="30" cy="-12" r="34"/><circle cx="66" r="26"/><rect width="66" height="26"/></g>
+        <g transform="translate(520 40) scale(.7)"><circle r="26"/><circle cx="30" cy="-12" r="34"/><circle cx="66" r="26"/><rect width="66" height="26"/></g>
+        <g transform="translate(1010 90) scale(1.1)"><circle r="26"/><circle cx="30" cy="-12" r="34"/><circle cx="66" r="26"/><rect width="66" height="26"/></g>
+        <g transform="translate(1320 40) scale(.6)"><circle r="26"/><circle cx="30" cy="-12" r="34"/><circle cx="66" r="26"/><rect width="66" height="26"/></g>
+      </g>
+    </svg>
+  </div>
+
+  <div id="app"></div>
+
+  <!-- Mole (task) editor -->
+  <dialog id="mole-dialog" class="sheet" aria-labelledby="mole-dialog-title">
+    <form id="mole-form" method="dialog">
+      <header class="sheet-head">
+        <h2 id="mole-dialog-title">New mole</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+      </header>
+      <label class="field-label" for="mole-title">What needs doing?</label>
+      <input id="mole-title" name="title" class="input" required autocomplete="off" maxlength="140" placeholder="e.g. Pay electricity bill" />
+      <div class="row-2">
+        <div>
+          <label class="field-label" for="mole-area">Machine</label>
+          <select id="mole-area" name="areaId" class="input"></select>
+        </div>
+        <div>
+          <label class="field-label" for="mole-due">Due <span class="opt">optional</span></label>
+          <input id="mole-due" type="date" name="due" class="input" />
+        </div>
+      </div>
+      <fieldset class="seg-wrap">
+        <legend class="field-label">Urgency</legend>
+        <div class="seg" data-urgency-seg></div>
+      </fieldset>
+      <footer class="sheet-foot">
+        <button type="button" class="btn btn-ghost danger" id="mole-delete" hidden><i data-icon="trash-2"></i>Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-white" data-close>Cancel</button>
+        <button type="submit" class="btn btn-red" id="mole-save">Pop it</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Machine (area) editor -->
+  <dialog id="machine-dialog" class="sheet wide" aria-labelledby="machine-dialog-title">
+    <form id="machine-form" method="dialog">
+      <header class="sheet-head">
+        <h2 id="machine-dialog-title">Install a machine</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+      </header>
+      <div class="machine-editor">
+        <div class="machine-preview" id="machine-preview" aria-hidden="true"></div>
+        <div class="machine-fields">
+          <label class="field-label" for="machine-name">Life area</label>
+          <input id="machine-name" name="name" class="input" required maxlength="24" autocomplete="off" placeholder="e.g. Friends, Car, Side project" />
+          <fieldset>
+            <legend class="field-label">Machine</legend>
+            <div class="type-picker" id="type-picker"></div>
+          </fieldset>
+          <fieldset>
+            <legend class="field-label">World</legend>
+            <div class="theme-picker" id="theme-picker"></div>
+          </fieldset>
+          <fieldset>
+            <legend class="field-label">Icon</legend>
+            <div class="icon-picker" id="icon-picker"></div>
+          </fieldset>
+        </div>
+      </div>
+      <footer class="sheet-foot">
+        <div class="machine-extra" id="machine-extra" hidden>
+          <button type="button" class="btn btn-ghost danger" id="machine-delete"><i data-icon="trash-2"></i>Remove</button>
+          <button type="button" class="icon-btn" id="machine-left" aria-label="Move machine earlier"><i data-icon="chevron-left"></i></button>
+          <button type="button" class="icon-btn" id="machine-right" aria-label="Move machine later"><i data-icon="chevron-right"></i></button>
+        </div>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-white" data-close>Cancel</button>
+        <button type="submit" class="btn btn-green" id="machine-save">Install</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Paste a list -->
+  <dialog id="bulk-dialog" class="sheet wide" aria-labelledby="bulk-title">
+    <form id="bulk-form" method="dialog">
+      <header class="sheet-head">
+        <h2 id="bulk-title">Add a list</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+      </header>
+      <p class="sheet-sub">Write or paste one task per line, in Hebrew or English. Each line is translated to English and sorted into a machine; check the picks below and fix anything before adding.
+        A heading like <b>בריאות:</b> sends the lines under it (until a blank line) to that machine. Lines with ✅ are logged as done.</p>
+      <label class="sr-only" for="bulk-text">Tasks, one per line</label>
+      <textarea id="bulk-text" class="input textarea" rows="6" dir="auto" placeholder="Book a dentist appointment&#10;לקנות למרפי חטיפים&#10;Pay the electricity bill"></textarea>
+      <div class="bulk-bar">
+        <label class="b-toggle"><input type="checkbox" id="bulk-translate" checked />Translate to English</label>
+        <span class="bulk-status" id="bulk-status" aria-live="polite"></span>
+      </div>
+      <ul id="bulk-preview" class="bulk-preview"></ul>
+      <footer class="sheet-foot">
+        <span class="bulk-count" id="bulk-count"></span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-white" data-close>Cancel</button>
+        <button type="submit" class="btn btn-red" id="bulk-save">Add</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Stats -->
+  <dialog id="stats-dialog" class="drawer" aria-labelledby="stats-title">
+    <header class="sheet-head">
+      <h2 id="stats-title">Player stats</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+    </header>
+    <div id="stats-body"></div>
+  </dialog>
+
+  <!-- Cloud Sync (Secret GitHub Gist) -->
+  <dialog id="sync-dialog" class="sheet" aria-labelledby="sync-title">
+    <form id="sync-form" method="dialog">
+      <header class="sheet-head">
+        <h2 id="sync-title">Cloud sync</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><i data-icon="x"></i></button>
+      </header>
+      <p class="sheet-sub">Keep your iPhone and Mac in sync automatically using a private <b>Secret GitHub Gist</b>. Your data stays fast on this device and syncs in the background.</p>
+
+      <div id="sync-status-card" class="sync-card"></div>
+
+      <div id="sync-pair-box" class="sync-pair" hidden>
+        <div class="sync-pair-text">
+          <b><i data-icon="smartphone"></i>Add your iPhone or Mac</b>
+          <small>Copy your one-paste setup code and paste it into Cloud sync on your other device.</small>
+        </div>
+        <button type="button" class="btn btn-white sm" id="sync-copy-code"><i data-icon="copy"></i>Copy code</button>
+      </div>
+
+      <label class="field-label" for="sync-token">GitHub Token <span class="opt">(with <b>gist</b> scope, or paste a setup code)</span></label>
+      <input id="sync-token" name="token" type="password" class="input" autocomplete="off" spellcheck="false" placeholder="ghp_… or wal1:… setup code" />
+
+      <label class="field-label" for="sync-gist">Gist ID <span class="opt">optional — auto-found or created if blank</span></label>
+      <input id="sync-gist" name="gistId" class="input" autocomplete="off" spellcheck="false" placeholder="Leave blank to auto-detect or create" />
+
+      <footer class="sheet-foot">
+        <button type="button" class="btn btn-ghost danger" id="sync-disconnect" hidden><i data-icon="trash-2"></i>Disconnect</button>
+        <button type="button" class="btn btn-white sm" id="sync-now" hidden><i data-icon="refresh-cw"></i>Sync now</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-white" data-close>Close</button>
+        <button type="submit" class="btn btn-green" id="sync-save">Connect &amp; Sync</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div id="hammer" class="hammer" aria-hidden="true">
+    <svg viewBox="0 0 120 120" width="104" height="104">
+      <rect x="54" y="38" width="13" height="78" rx="6" fill="#E3A76A" stroke="#1F2544" stroke-width="3"/>
+      <rect x="14" y="8" width="92" height="40" rx="14" fill="#F0473E" stroke="#1F2544" stroke-width="3.5"/>
+      <rect x="10" y="12" width="12" height="32" rx="5" fill="#C9302A" stroke="#1F2544" stroke-width="3"/>
+      <rect x="98" y="12" width="12" height="32" rx="5" fill="#C9302A" stroke="#1F2544" stroke-width="3"/>
+      <rect x="28" y="15" width="58" height="7" rx="3.5" fill="#fff" opacity=".55"/>
+    </svg>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="fx" class="fx" aria-hidden="true"></div>
+  <input type="file" id="import-file" accept="application/json" hidden />
+
+  <script src="icons.js"></script>
+  <script src="themes.js"></script>
+  <script src="park.js"></script>
+  <script src="seeds.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
