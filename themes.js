@@ -11,7 +11,9 @@
     apartment:   { name: "Home Base",    primary: "#FF9F43", secondary: "#4ECDC4", cab: "#DB7A22", sky: ["#FFE9CF", "#FFF5E8"], far: "#F6CFA3", near: "#D9A26E", ground: ["#DDA56B", "#CF9459"], rim: "#AE7440", hat: "hardhat", scene: "lamps" },
     money:       { name: "Gold Rush",    primary: "#2FCB7A", secondary: "#FFC93C", cab: "#1E9C5B", sky: ["#D3F5E1", "#F0FBF4"], far: "#ABE6C4", near: "#1E9C5B", ground: ["#63C990", "#52BA80"], rim: "#33995F", hat: "visor",   scene: "coins" },
     travel:      { name: "Jet Set",      primary: "#FF7A59", secondary: "#4EA8F5", cab: "#E2573A", sky: ["#86CFFF", "#D3EEFF"], far: "#9ED8F7", near: "#5BB5E8", ground: ["#F5D78F", "#ECC877"], rim: "#D2AA55", hat: "shades",  scene: "clouds" },
-    health:      { name: "Pulse Gym",    primary: "#2EC4B6", secondary: "#FF5A6E", cab: "#1B9C90", sky: ["#D2F6F0", "#EFFCFA"], far: "#B2EBE1", near: "#5FC9BA", ground: ["#83D9CA", "#70CCBC"], rim: "#47AD9D", hat: "band",    scene: "pulse" },
+    health:      { name: "Pulse Clinic", primary: "#2EC4B6", secondary: "#FF5A6E", cab: "#1B9C90", sky: ["#D2F6F0", "#EFFCFA"], far: "#B2EBE1", near: "#5FC9BA", ground: ["#83D9CA", "#70CCBC"], rim: "#47AD9D", hat: "med",     scene: "pulse" },
+    fitness:     { name: "Iron Gym",     primary: "#FF5E5B", secondary: "#FFC93C", cab: "#D63E3B", sky: ["#FFE2DC", "#FFF4F2"], far: "#F5B8B2", near: "#E07A74", ground: ["#9BA8B8", "#8796A8"], rim: "#68778A", hat: "band",    scene: "gym" },
+    errands:     { name: "City Run",     primary: "#5C7CFA", secondary: "#FFC93C", cab: "#3B5BDB", sky: ["#DCE6FF", "#F2F6FF"], far: "#B8CCFF", near: "#748FFC", ground: ["#B2BCC8", "#9EA9B8"], rim: "#7A8696", hat: "cap",     scene: "errands" },
     family:      { name: "Backyard",     primary: "#FF6F91", secondary: "#FFC93C", cab: "#DE4A70", sky: ["#FFDDE5", "#FFF2F5"], far: "#FFC2CF", near: "#8D6E9C", ground: ["#9BD67F", "#88C86C"], rim: "#64A84B", hat: "bow",     scene: "hearts" },
     possessions: { name: "Warehouse",    primary: "#F4B740", secondary: "#FF7A59", cab: "#C98A1B", sky: ["#F4E8D4", "#FBF6EC"], far: "#E6D3B3", near: "#A88B62", ground: ["#C9C3B8", "#B9B2A6"], rim: "#968F83", hat: "box",     scene: "crates" },
     murphy:      { name: "Dog Park",     primary: "#F59E42", secondary: "#4EA8F5", cab: "#D2782A", sky: ["#BDE5FF", "#E8F6FF"], far: "#B9E3A0", near: "#8ACB6E", ground: ["#8ED07A", "#7BC267"], rim: "#5DA449", hat: "ears",    scene: "park" },
@@ -30,14 +32,16 @@
     money: { theme: "money", icon: "wallet" },
     travel: { theme: "travel", icon: "plane" },
     health: { theme: "health", icon: "heart-pulse" },
+    fitness: { theme: "fitness", icon: "dumbbell" },
+    errands: { theme: "errands", icon: "clipboard-check" },
     family: { theme: "family", icon: "users" },
     possessions: { theme: "possessions", icon: "package" },
     murphy: { theme: "murphy", icon: "dog" },
   };
 
   const AREA_ICONS = [
-    "briefcase", "graduation-cap", "house", "wallet", "plane", "heart-pulse", "users", "package",
-    "dog", "paw-print", "bone", "star", "dumbbell", "car", "palette", "music", "book-open", "code",
+    "briefcase", "graduation-cap", "house", "wallet", "plane", "heart-pulse", "dumbbell", "clipboard-check",
+    "users", "package", "dog", "paw-print", "bone", "star", "car", "palette", "music", "book-open", "code",
     "gamepad-2", "leaf", "baby", "coffee", "shopping-cart", "sparkles", "wrench", "globe",
   ];
 
@@ -121,7 +125,26 @@
       for (let x = 0; x < 1200; x += 300) p += ` ${x + 120},230 ${x + 140},200 ${x + 160},230 ${x + 180},230 ${x + 195},110 ${x + 212},320 ${x + 228},230 ${x + 300},230`;
       s += `<polyline points="${p}" fill="none" stroke="${t.secondary}" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>`;
       s += heart(1030, 120, 5, t.secondary, 0.25);
-      s += `<g transform="translate(180 120) rotate(-20)" fill="${t.near}"><rect x="-70" y="-8" width="140" height="16" rx="8"/><rect x="-86" y="-34" width="22" height="68" rx="8"/><rect x="64" y="-34" width="22" height="68" rx="8"/></g>`;
+      s += `<g transform="translate(180 120)"><rect x="-36" y="-12" width="72" height="24" rx="5" fill="${t.secondary}" opacity=".3"/><rect x="-12" y="-36" width="24" height="72" rx="5" fill="${t.secondary}" opacity=".3"/></g>`;
+      return s;
+    },
+    gym(t) {
+      let s = `<rect x="0" y="340" width="1200" height="160" fill="${t.far}"/><rect x="0" y="330" width="1200" height="12" fill="${t.near}"/>`;
+      for (const x of [160, 1040]) {
+        s += `<rect x="${x - 8}" y="80" width="16" height="260" fill="${t.near}"/><rect x="${x - 80}" y="130" width="160" height="12" rx="6" fill="${t.near}"/>`;
+        for (const dx of [-64, -46, 46, 64]) s += `<rect x="${x + dx - 8}" y="92" width="16" height="88" rx="5" fill="${INK}" opacity=".55"/>`;
+      }
+      s += `<g transform="translate(600 150)" fill="${t.near}" opacity=".45"><rect x="-110" y="-10" width="220" height="20" rx="10"/><rect x="-136" y="-48" width="28" height="96" rx="10"/><rect x="108" y="-48" width="28" height="96" rx="10"/></g>`;
+      return s;
+    },
+    errands(t, r) {
+      let s = sun(1040, 96, 40) + cloud(180, 84, 0.95) + cloud(680, 70, 0.75, 0.9);
+      for (let x = 20; x < 1180; x += 190) {
+        const h = 160 + (x % 3) * 45;
+        s += `<rect x="${x}" y="${500 - h}" width="150" height="${h}" rx="6" fill="${t.far}"/>`;
+        s += `<path d="M${x - 8} ${500 - h + 36} H${x + 158} L${x + 146} ${500 - h} H${x + 4}Z" fill="${t.primary}" opacity=".55"/>`;
+      }
+      s += `<g transform="translate(580 180)"><circle r="44" fill="#fff" stroke="${t.near}" stroke-width="8"/><path d="M0 -26V0L18 12" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round"/></g>`;
       return s;
     },
     hearts(t, r) {
@@ -217,6 +240,8 @@
     visor: (t) => `<path d="M28 36Q60 22 92 36v6Q60 28 28 42z" fill="${t.primary}" stroke="${MI}" stroke-width="2.5" stroke-linejoin="round"/><path d="M34 40Q60 32 86 40Q80 47 60 47Q40 47 34 40Z" fill="${t.primary}" stroke="${MI}" stroke-width="2.5"/>`,
     shades: (t) => `<path d="M32 49h23q2 14-11 14t-12-14z" fill="${INK}" stroke="${MI}" stroke-width="2"/><path d="M65 49h23q0 14-12 14t-11-14z" fill="${INK}" stroke="${MI}" stroke-width="2"/><path d="M55 51q5-3 10 0" stroke="${MI}" stroke-width="3" fill="none"/><path d="M37 53h7M70 53h7" stroke="${t.primary}" stroke-width="3" stroke-linecap="round"/>`,
     band: (t) => `<rect x="27" y="33" width="66" height="12" rx="6" fill="${t.primary}" stroke="${MI}" stroke-width="2.5"/><rect x="29" y="38" width="62" height="2.5" fill="#fff"/><path d="M90 40l12 6-3 7-11-4z" fill="${t.primary}" stroke="${MI}" stroke-width="2"/>`,
+    med: (t) => `<rect x="28" y="32" width="64" height="10" rx="5" fill="#fff" stroke="${MI}" stroke-width="2.5"/><circle cx="60" cy="30" r="11" fill="#E9F5FF" stroke="${MI}" stroke-width="2.5"/><path d="M55 30h10M60 25v10" stroke="${t.secondary}" stroke-width="3" stroke-linecap="round"/>`,
+    cap: (t) => `<path d="M30 33Q30 9 60 9Q90 9 90 33Z" fill="${t.primary}" stroke="${MI}" stroke-width="2.5"/><path d="M60 9Q74 15 74 33" fill="none" stroke="${MI}" stroke-width="2" opacity=".35"/><path d="M26 31h72q8 0 8 5t-12 5H26Z" fill="${t.secondary}" stroke="${MI}" stroke-width="2.5"/><circle cx="60" cy="9" r="3.5" fill="${t.secondary}" stroke="${MI}" stroke-width="2"/>`,
     bow: (t) => `<path d="M82 22L66 11l2 22zM82 22l16-11-2 22z" fill="${t.primary}" stroke="${MI}" stroke-width="2.5" stroke-linejoin="round"/><circle cx="82" cy="22" r="5.5" fill="${t.secondary}" stroke="${MI}" stroke-width="2"/>`,
     box: () => `<g transform="rotate(-9 60 16)"><rect x="38" y="0" width="44" height="26" rx="3" fill="#E7BC80" stroke="${MI}" stroke-width="2.5"/><rect x="55" y="1" width="10" height="24" fill="#F6E2BC"/><path d="M42 16h8M42 20h6" stroke="${MI}" stroke-width="1.8"/></g>`,
     ears: (t) => `<path d="M34 28C14 30 8 62 18 80C30 78 34 56 42 40Z" fill="#7A4A2A" stroke="${MI}" stroke-width="3" stroke-linejoin="round"/><path d="M86 28C106 30 112 62 102 80C90 78 86 56 78 40Z" fill="#7A4A2A" stroke="${MI}" stroke-width="3" stroke-linejoin="round"/><path d="M22 97Q60 110 98 97L98 106Q60 119 22 106Z" fill="${t.secondary}" stroke="${MI}" stroke-width="2.5"/><circle cx="60" cy="116" r="6.5" fill="#FFC93C" stroke="${MI}" stroke-width="2.5"/>`,

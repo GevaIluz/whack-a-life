@@ -202,6 +202,75 @@
     },
   };
 
+  TYPES.gym = {
+    label: "Power rack", w: 380, h: 438,
+    win: { x: 84, y: 178, w: 212, h: 126, r: "10px" },
+    sign: { x: 96, y: 112, w: 188, h: 38 },
+    art: (t) => {
+      const plate = (x, h, col) => `<rect x="${x}" y="${f1(62 - h / 2)}" width="20" height="${h}" rx="6" fill="${col}" ${S}/><rect x="${x + 4}" y="${f1(68 - h / 2)}" width="5" height="${f1(h - 12)}" rx="2.5" fill="#fff" opacity=".3"/>`;
+      const kb = (cx, cy, r, col, kg) => `<path d="M${cx - r * 0.55} ${cy - r * 0.7}V${cy - r * 1.25}A${r * 0.55} ${r * 0.4} 0 0 1 ${cx + r * 0.55} ${cy - r * 1.25}V${cy - r * 0.7}" fill="none" stroke="${INK}" stroke-width="9" stroke-linecap="round"/><path d="M${cx - r * 0.55} ${cy - r * 0.7}V${cy - r * 1.25}A${r * 0.55} ${r * 0.4} 0 0 1 ${cx + r * 0.55} ${cy - r * 1.25}V${cy - r * 0.7}" fill="none" stroke="#C9CED8" stroke-width="4" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col}" ${S}/>${txt(cx, cy + 6, kg, 14, "#fff", 3)}`;
+      return `
+      <g class="barbell">
+        <rect x="6" y="56" width="368" height="12" rx="6" fill="#C9CED8" ${S}/>
+        ${plate(22, 74, t.secondary)}${plate(44, 96, t.primary)}${plate(66, 112, "#343B52")}
+        ${plate(338, 74, t.secondary)}${plate(316, 96, t.primary)}${plate(294, 112, "#343B52")}
+      </g>
+      <rect x="56" y="96" width="22" height="328" rx="6" fill="${t.cab}" ${S}/>
+      <rect x="302" y="96" width="22" height="328" rx="6" fill="${t.cab}" ${S}/>
+      ${[150, 190, 230, 270, 310, 350, 390].map((y) => `<circle cx="67" cy="${y}" r="3" fill="${INK}"/><circle cx="313" cy="${y}" r="3" fill="${INK}"/>`).join("")}
+      <rect x="48" y="104" width="284" height="54" rx="14" fill="${t.primary}" ${S}/>
+      ${hl(66, 112, 248, 6, 0.4)}
+      <rect x="74" y="168" width="232" height="146" rx="16" fill="${INK}"/>
+      <rect x="78" y="330" width="224" height="24" rx="8" fill="${t.secondary}" ${S}/>
+      <rect x="68" y="352" width="244" height="72" rx="10" fill="${dark(t.cab, 0.15)}" ${S}/>
+      ${kb(124, 396, 26, t.primary, "16")}${kb(190, 392, 30, "#343B52", "24")}
+      <g transform="translate(264 364)">
+        <rect x="0" y="12" width="32" height="48" rx="7" fill="#4ECDC4" ${S2}/>
+        <rect x="-3" y="4" width="38" height="10" rx="4" fill="${t.primary}" ${S2}/>
+        <path d="M10 4v-8h12v8" fill="${t.secondary}" ${S2}/>
+        ${hl(6, 20, 5, 30, 0.45)}
+      </g>
+      <rect x="26" y="422" width="328" height="14" rx="7" fill="${INK}"/>`;
+    },
+  };
+
+  TYPES.errands = {
+    label: "Errand booth", w: 360, h: 436,
+    win: { x: 68, y: 178, w: 216, h: 120, r: "10px" },
+    sign: { x: 76, y: 118, w: 200, h: 36 },
+    art: (t) => {
+      const stripes = [...Array(7)].map((_, i) => `<rect x="${44 + i * 38}" y="58" width="38" height="46" fill="${i % 2 ? "#fff" : t.primary}"/>`).join("");
+      const scallops = [...Array(7)].map((_, i) => `<path d="M${44 + i * 38} 102a19 14 0 0 0 38 0Z" fill="${i % 2 ? "#fff" : t.primary}" ${S2}/>`).join("");
+      return `
+      <g class="ticket-top">
+        <rect x="128" y="12" width="96" height="42" rx="10" fill="#F0473E" ${S}/>
+        <rect x="140" y="20" width="72" height="26" rx="5" fill="#FFF6E2" ${S2}/>
+        ${txt(176, 39, "NOW #42", 15, "#F0473E", 0)}
+      </g>
+      <rect x="48" y="100" width="256" height="322" rx="14" fill="${t.cab}" ${S}/>
+      <g>${stripes}<rect x="44" y="58" width="266" height="46" rx="10" fill="none" ${S}/>${scallops}</g>
+      <rect x="64" y="112" width="224" height="48" rx="12" fill="${t.secondary}" ${S}/>
+      <rect x="58" y="168" width="236" height="140" rx="14" fill="${INK}"/>
+      <g class="flag" transform="translate(12 200)">
+        <rect x="0" y="28" width="36" height="52" rx="10" fill="#F0473E" ${S}/>
+        <rect x="6" y="40" width="24" height="6" rx="3" fill="${INK}"/>
+        <path d="M18 28V4" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
+        <path d="M18 4h20l-5 8 5 8H18Z" fill="${t.secondary}" ${S2}/>
+      </g>
+      <rect x="64" y="322" width="224" height="86" rx="10" fill="#FFF6E2" ${S}/>
+      <path d="M84 346l8 8 16-16M84 378l8 8 16-16" fill="none" stroke="#2FCB7A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M122 346h90M122 378h72" stroke="${INK}" stroke-width="5" stroke-linecap="round" opacity=".65"/>
+      <g transform="translate(296 322)">
+        <path d="M8 22Q24 -2 40 22" fill="none" stroke="${INK}" stroke-width="4"/>
+        <rect x="0" y="20" width="52" height="88" rx="8" fill="#E7BC80" ${S}/>
+        <rect x="10" y="4" width="14" height="22" rx="6" fill="#F4A261" ${S2}/>
+        <circle cx="26" cy="60" r="10" fill="${t.secondary}" ${S2}/>
+        <circle cx="26" cy="60" r="3.5" fill="${INK}"/>
+      </g>
+      <rect x="22" y="418" width="316" height="14" rx="7" fill="${INK}"/>`;
+    },
+  };
+
   const horse = (t) => `
     <path d="M30 2q18 6 14 28" fill="none" stroke="${INK}" stroke-width="9" stroke-linecap="round"/>
     <path d="M30 2q18 6 14 28" fill="none" stroke="${t.primary}" stroke-width="4.5" stroke-linecap="round"/>
@@ -381,8 +450,8 @@
       <rect x="6" y="308" width="218" height="14" rx="6" fill="${INK}"/></g>`,
   };
 
-  const THEME_TYPE = { work: "laptop", mba: "books", apartment: "house", money: "piggy", travel: "airplane", health: "striker", family: "carousel", possessions: "capsule", murphy: "shepherd", arcade: "upright", forest: "claw", ocean: "upright", sunset: "claw" };
-  const PICKABLE = ["laptop", "books", "house", "piggy", "airplane", "striker", "carousel", "capsule", "shepherd", "upright", "claw"];
+  const THEME_TYPE = { work: "laptop", mba: "books", apartment: "house", money: "piggy", travel: "airplane", health: "striker", fitness: "gym", errands: "errands", family: "carousel", possessions: "capsule", murphy: "shepherd", arcade: "upright", forest: "claw", ocean: "upright", sunset: "claw" };
+  const PICKABLE = ["laptop", "books", "house", "piggy", "airplane", "striker", "gym", "errands", "carousel", "capsule", "shepherd", "upright", "claw"];
   const typeFor = (area) => (TYPES[area?.machine] && area.machine !== "whacktable" ? area.machine : THEME_TYPE[area?.theme] || "upright");
 
   window.WAL_PARK = { TYPES, PICKABLE, typeFor };

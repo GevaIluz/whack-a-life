@@ -11,7 +11,7 @@
   const GIST_FILENAME = "whack-a-life-sync.json";
   const DEFAULT_GIST_ID = "05466cbaca8486f92f45f3909f9be49e";
   const BIRTH_DATE = "1998-10-03";
-  const DEFAULT_AREAS = ["Work", "MBA", "Apartment", "Money", "Travel", "Health", "Family", "Possessions", "Murphy"];
+  const DEFAULT_AREAS = ["Work", "MBA", "Apartment", "Money", "Travel", "Health", "Fitness", "Errands", "Family", "Possessions", "Murphy"];
   const URG = {
     low: { label: "Chill", weight: 1, mood: "sleepy" },
     medium: { label: "Normal", weight: 2, mood: "normal" },
@@ -56,6 +56,8 @@
       deletedIds: {},
       settings: { muted: false, birthDate: BIRTH_DATE, playBest: 0 },
       addedMurphy: true,
+      addedFitness: true,
+      addedErrands: true,
     };
   }
   function migrate(s) {
@@ -71,6 +73,37 @@
       if (!s.areas.some((a) => a.name.trim().toLowerCase() === "murphy"))
         s.areas.push({ id: uid(), name: "Murphy", order: Math.max(-1, ...s.areas.map((a) => a.order ?? 0)) + 1, updatedAt: 0 });
       s.addedMurphy = true;
+    }
+    if (!s.addedFitness) {
+      let fit = s.areas.find((a) => a.name.trim().toLowerCase() === "fitness");
+      const healthIdx = s.areas.findIndex((a) => a.name.trim().toLowerCase() === "health");
+      if (!fit) {
+        fit = { id: uid(), name: "Fitness", theme: "fitness", icon: "dumbbell", type: "gym", order: 0, updatedAt: 0 };
+        if (healthIdx >= 0) s.areas.splice(healthIdx + 1, 0, fit);
+        else s.areas.push(fit);
+        s.areas.forEach((a, i) => { a.order = i; });
+      }
+      const health = s.areas.find((a) => a.name.trim().toLowerCase() === "health");
+      if (health && fit) {
+        const fitRe = /\b(kg|weight|work\s*out|workout|gym|fitness|body|muscle)\b/i;
+        for (const m of s.moles) {
+          if (m.areaId === health.id && fitRe.test(m.title)) {
+            m.areaId = fit.id;
+            m.updatedAt = Math.max(m.updatedAt || 0, Date.now());
+          }
+        }
+      }
+      s.addedFitness = true;
+    }
+    if (!s.addedErrands) {
+      if (!s.areas.some((a) => a.name.trim().toLowerCase() === "errands")) {
+        const err = { id: uid(), name: "Errands", theme: "errands", icon: "clipboard-check", type: "errands", order: 0, updatedAt: 0 };
+        const fitIdx = s.areas.findIndex((a) => a.name.trim().toLowerCase() === "fitness");
+        if (fitIdx >= 0) s.areas.splice(fitIdx + 1, 0, err);
+        else s.areas.push(err);
+        s.areas.forEach((a, i) => { a.order = i; });
+      }
+      s.addedErrands = true;
     }
     s.areas.forEach((a, i) => {
       const d = AREA_DEFAULTS[(a.name || "").trim().toLowerCase()] || {};
@@ -191,6 +224,8 @@
       deletedIds,
       settings,
       addedMurphy: L.addedMurphy || R.addedMurphy,
+      addedFitness: L.addedFitness || R.addedFitness,
+      addedErrands: L.addedErrands || R.addedErrands,
       appliedSeeds,
     });
   }
@@ -229,9 +264,10 @@
     const b = keyToDate(state.settings.birthDate || BIRTH_DATE), now = new Date();
     let age = now.getFullYear() - b.getFullYear();
     if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
-    const month = now.toLocaleDateString(undefined, { month: "long" });
+    const step = ((now.getMonth() - b.getMonth() + 12) % 12) + 1;
+    const month = `${step}/12`;
     const isBirthday = now.getMonth() === b.getMonth() && now.getDate() === b.getDate();
-    return { age, month, isBirthday };
+    return { age, step, month, isBirthday };
   }
 
   // ---------------- task rules ----------------
@@ -969,7 +1005,9 @@
     apartment: { strong: ["apartment", "flat", "landlord", "lease", "couch", "sofa", "mattress", "rats", "kitchen", "bathroom", "laundry", "dishes", "plumber", "electrician", "דירה", "בעל דירה", "בעל הבית", "חוזה", "ספה", "מזרן", "חולד", "מטבח", "אמבטיה", "כביסה", "כלים", "אינסטלטור", "חשמלאי", "לתלות", "מקרר"], weak: ["clean", "home", "house", "לנקות", "ניקיון", "בית"] },
     money: { strong: ["money", "pay", "bank", "budget", "bill", "invoice", "charge", "fine", "ticket", "tax", "municipality", "city hall", "appeal", "electricity", "rent", "savings", "save", "refund", "salary", "insurance", "buyme", "כסף", "לשלם", "תשלום", "בנק", "תקציב", "חשבון", "חשבונית", "חיוב", "דוח", "קנס", "מס", "חיסכון", "החזר", "משכורת", "ביטוח", "עירייה", "ערעור"] },
     travel: { strong: ["נסיעות", "trip", "flight", "vacation", "holiday", "hotel", "travel", "passport", "airbnb", "booking", "טיסה", "חופשה", "טיול", "מלון", "נסיעה", "דרכון", "צימר"] },
-    health: { strong: ["doctor", "dentist", "tooth", "teeth", "gym", "workout", "health", "physio", "therapy", "medicine", "pharmacy", "blood test", "weight", "run", "gastro", "orthopedi", "dermatolog", "shoulder", "colitis", "skin", "רופא", "רופאת", "שיניים", "שן", "אימון", "בריאות", "משקל", "כושר", "קוליטיס", "גסטרו", "אורטופד", "עור", "תרופה", "מרשם", "בדיקת דם", "פיזיותרפיה", "ריצה", "חדר כושר"], weak: ["appointment", "תור"] },
+    health: { strong: ["doctor", "dentist", "tooth", "teeth", "health", "physio", "therapy", "medicine", "pharmacy", "blood test", "gastro", "orthopedi", "dermatolog", "shoulder", "colitis", "skin", "רופא", "רופאת", "שיניים", "שן", "בריאות", "קוליטיס", "גסטרו", "אורטופד", "עור", "תרופה", "מרשם", "בדיקת דם", "פיזיותרפיה"], weak: ["appointment", "תור"] },
+    fitness: { strong: ["fitness", "gym", "workout", "work out", "weight", "kg", "kilo", "body", "muscle", "cardio", "run", "running", "protein", "creatine", "diet", "calories", "cut", "bulk", "lifting", "barbell", "kettlebell", "pushup", "pullup", "abs", "אימון", "כושר", "משקל", "קילו", "ק״ג", "ק\"ג", "חדר כושר", "מכון", "גוף", "שריר", "ריצה", "חלבון", "דיאטה", "חיטוב", "מסה", "לרדת במשקל"] },
+    errands: { strong: ["errand", "errands", "סידורים", "סידור", "post office", "mail", "parcel", "package", "pickup", "pick up", "return", "drop off", "dry cleaning", "key", "duplicate", "cobbler", "tailor", "print", "form", "renew", "queue", "דואר", "חבילה", "לאסוף", "איסוף", "החזרה", "להחזיר", "ניקוי יבש", "מפתח", "שכפול", "לשכפל", "סנדלר", "תופרת", "סוללות", "להדפיס", "טופס", "בירוקרטיה"] },
     family: { strong: ["family", "mom", "dad", "mother", "father", "grandma", "grandpa", "brother", "sister", "wedding", "birthday", "grandmother", "grandfather", "parents", "nephew", "niece", "משפחה", "אמא", "אבא", "סבתא", "סבא", "אח ", "אחות", "חתונה", "יום הולדת", "אחיין", "אחיינית", "הורים"] },
     possessions: { strong: ["equipment", "gear", "ציוד", "רכוש", "tv", "iphone", "phone", "laptop", "bike", "sneakers", "shoes", "pots", "shower head", "tami4", "headphones", "furniture", "טלוויזיה", "אייפון", "טלפון", "מחשב", "אופניים", "סניקרס", "נעליים", "סירים", "דוש", "תמי", "אוזניות", "רהיט"], weak: ["buy", "order", "fix", "repair", "new", "replace", "לקנות", "להזמין", "לתקן", "חדש", "להחליף"] },
     murphy: { strong: ["murphy", "dog", "vet", "dog food", "treats", "snacks", "leash", "walk the dog", "מרפי", "כלב", "וטרינר", "אוכל לכלב", "חטיפים", "רצועה", "טיול עם"] },
@@ -1082,7 +1120,7 @@
 
   const bulkDialog = $("#bulk-dialog"), bulkText = $("#bulk-text"), bulkPreview = $("#bulk-preview");
   let bulkRows = [], bulkOverrides = new Map();
-  const fallbackArea = () => (route.view === "game" && areaById(route.id)) || areaById(lastAreaId) || sortedAreas()[0];
+  const fallbackArea = () => (route.view === "game" && areaById(route.id)) || areaById(lastAreaId) || state.areas.find((a) => norm(a.name) === "errands") || sortedAreas()[0];
 
   function openBulk() {
     if (!state.areas.length) return openMachineDialog();
