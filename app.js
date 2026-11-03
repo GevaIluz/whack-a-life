@@ -10,7 +10,7 @@
   const SYNC_KEY = "whack-a-life-sync-v1";
   const GIST_FILENAME = "whack-a-life-sync.json";
   const DEFAULT_GIST_ID = "05466cbaca8486f92f45f3909f9be49e";
-  const APP_BUILD = "2026-11-03-v6";
+  const APP_BUILD = "2026-11-03-v7";
   const BIRTH_DATE = "1998-10-03";
   const DEFAULT_AREAS = ["Work", "MBA", "Apartment", "Money", "Travel", "Health", "Fitness", "Errands", "Family", "Possessions", "Murphy"];
   const URG = {
@@ -195,6 +195,10 @@
     });
     s.moles.forEach((m) => {
       m.updatedAt ??= m.createdAt || 0;
+      if (!URG[m.urgency]) m.urgency = m.urgent ? "high" : "medium";
+      if (m.due === undefined) m.due = m.dueDate || null;
+      delete m.urgent;
+      delete m.dueDate;
       syncMoleCycle(m);
     });
     s.history.forEach((h) => { h.moleId ||= h.id; });
@@ -790,8 +794,8 @@
     const topBadge = m.repeat ? comboBadgeHTML(m) : dueBadge;
     return `<div class="hole" style="--i:${i}">
       <div class="hole-art">${topBadge}${holeBack}
-        <div class="pit"><button class="mole u-${m.urgency}${st === "overdue" ? " overdue" : ""}${m.id === justAdded ? " pop" : ""}" data-whack="${m.id}"
-          aria-label="Whack: ${esc(m.title)} (${URG[m.urgency].label}${dueText(m) ? ", " + dueText(m) : ""})">${moleSVG(t.id, moodOf(m))}</button></div>
+        <div class="pit"><button class="mole u-${m.urgency || "medium"}${st === "overdue" ? " overdue" : ""}${m.id === justAdded ? " pop" : ""}" data-whack="${m.id}"
+          aria-label="Whack: ${esc(m.title)} (${(URG[m.urgency] || URG.medium).label}${dueText(m) ? ", " + dueText(m) : ""})">${moleSVG(t.id, moodOf(m))}</button></div>
         ${holeFront}
       </div>
       <button class="tag" data-edit="${m.id}" title="${esc(m.title)} (click to edit)"><span dir="auto">${esc(m.title)}</span>${icon("pencil", "tag-edit")}</button>
@@ -867,7 +871,7 @@
             <div class="panel-head"><h2>Moles loose</h2><span class="count">${moles.length}</span></div>
             ${moles.length ? `<ul class="queue">${moles.map((m) => `
               <li class="q-row">
-                <span class="dot u-${m.urgency}" title="${URG[m.urgency].label}"></span>
+                <span class="dot u-${m.urgency || "medium"}" title="${(URG[m.urgency] || URG.medium).label}"></span>
                 <button class="q-title" data-edit="${m.id}" title="Edit" dir="auto">${esc(m.title)}</button>
                 ${comboChipHTML(m)}
                 ${dueChip(m)}
